@@ -124,7 +124,14 @@ const defaultTutorialState: TutorialState = {
   currentStep: 'welcome',
 };
 
-const TUTORIAL_STEPS: TutorialStep[] = ['welcome', 'calendar', 'tasks', 'email', 'family', 'complete'];
+const TUTORIAL_STEPS: TutorialStep[] = [
+  'welcome',
+  'calendar',
+  'tasks',
+  'email',
+  'family',
+  'complete',
+];
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -155,7 +162,7 @@ export const useSettingsStore = create<SettingsState>()(
       nextTutorialStep: () =>
         set((state) => {
           const currentIndex = TUTORIAL_STEPS.indexOf(state.tutorial.currentStep);
-          const nextStep = TUTORIAL_STEPS[currentIndex + 1] || 'complete';
+          const nextStep = TUTORIAL_STEPS[currentIndex + 1] ?? 'complete';
           return {
             tutorial: {
               ...state.tutorial,
@@ -234,10 +241,13 @@ export const useSettingsStore = create<SettingsState>()(
 
 // Selector hooks for optimized re-renders
 export const selectIsFirstRun = (state: SettingsState): boolean => state.isFirstRun;
-export const selectHasCompletedOnboarding = (state: SettingsState): boolean => state.hasCompletedOnboarding;
+export const selectHasCompletedOnboarding = (state: SettingsState): boolean =>
+  state.hasCompletedOnboarding;
 export const selectUserSettings = (state: SettingsState): UserSettings => state.user;
-export const selectAppearanceSettings = (state: SettingsState): AppearanceSettings => state.appearance;
+export const selectAppearanceSettings = (state: SettingsState): AppearanceSettings =>
+  state.appearance;
 export const selectRegionalSettings = (state: SettingsState): RegionalSettings => state.regional;
-export const selectNotificationSettings = (state: SettingsState): NotificationSettings => state.notifications;
+export const selectNotificationSettings = (state: SettingsState): NotificationSettings =>
+  state.notifications;
 export const selectPrivacySettings = (state: SettingsState): PrivacySettings => state.privacy;
 export const selectTutorialState = (state: SettingsState): TutorialState => state.tutorial;

@@ -375,27 +375,21 @@ export function EmailPreferencesPanel(): JSX.Element {
             checked={preferences.notifications.soundEnabled}
             description="Play a sound for new emails"
             label="Notification sound"
-            onCheckedChange={(checked) =>
-              updateNotificationPreferences({ soundEnabled: checked })
-            }
+            onCheckedChange={(checked) => updateNotificationPreferences({ soundEnabled: checked })}
           />
 
           <SwitchRow
             checked={preferences.notifications.showPreview}
             description="Include message preview in notifications"
             label="Show preview"
-            onCheckedChange={(checked) =>
-              updateNotificationPreferences({ showPreview: checked })
-            }
+            onCheckedChange={(checked) => updateNotificationPreferences({ showPreview: checked })}
           />
 
           <SwitchRow
             checked={preferences.notifications.importantOnly}
             description="Only notify for important messages"
             label="Important only"
-            onCheckedChange={(checked) =>
-              updateNotificationPreferences({ importantOnly: checked })
-            }
+            onCheckedChange={(checked) => updateNotificationPreferences({ importantOnly: checked })}
           />
         </CardContent>
       </Card>

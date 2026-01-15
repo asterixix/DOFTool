@@ -34,7 +34,9 @@ export function SecureEmailRenderer({
 
   // Determine if content needs iframe (only for very complex HTML)
   const needsIframe = useMemo(() => {
-    if (!html) {return false;}
+    if (!html) {
+      return false;
+    }
     // Only use iframe for emails with embedded styles or complex layouts
     const hasStyleTags = /<style[\s\S]*?>[\s\S]*?<\/style>/i.test(html);
     const hasComplexLayout = /<table[\s\S]*?>[\s\S]*?<\/table>[\s\S]*?<table/i.test(html);
@@ -88,10 +90,14 @@ export function SecureEmailRenderer({
   // Handle iframe content and height adjustment
   const updateIframeContent = useCallback(() => {
     const iframe = iframeRef.current;
-    if (!iframe || renderMode !== 'iframe' || !sanitizedHtml) {return;}
+    if (!iframe || renderMode !== 'iframe' || !sanitizedHtml) {
+      return;
+    }
 
     const doc = iframe.contentDocument;
-    if (!doc) {return;}
+    if (!doc) {
+      return;
+    }
 
     // Build iframe document with minimal, optimized styling
     const isDark = document.documentElement.classList.contains('dark');
@@ -129,10 +135,14 @@ export function SecureEmailRenderer({
           }
           
           /* Dark mode adjustments */
-          ${isDark ? `
+          ${
+            isDark
+              ? `
             img:not([src^="data:"]) { opacity: 0.9; }
             table { border-color: #374151 !important; }
-          ` : ''}
+          `
+              : ''
+          }
         </style>
       </head>
       <body>${sanitizedHtml}</body>
@@ -168,7 +178,9 @@ export function SecureEmailRenderer({
   // Apply dark mode styles for inline rendering
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || renderMode !== 'inline') {return;}
+    if (!container || renderMode !== 'inline') {
+      return;
+    }
 
     const isDarkMode =
       document.documentElement.classList.contains('dark') ||
@@ -189,7 +201,8 @@ export function SecureEmailRenderer({
           // Simple placeholder
           img.style.display = 'none';
           const placeholder = document.createElement('div');
-          placeholder.className = 'inline-block px-2 py-1 text-xs text-muted-foreground bg-muted border border-dashed rounded';
+          placeholder.className =
+            'inline-block px-2 py-1 text-xs text-muted-foreground bg-muted border border-dashed rounded';
           placeholder.textContent = `Image: ${img.alt || 'Could not load'}`;
           img.parentNode?.replaceChild(placeholder, img);
         };
@@ -200,7 +213,12 @@ export function SecureEmailRenderer({
   // Empty state
   if (!hasContent || displayMode === 'empty') {
     return (
-      <div className={cn('flex flex-col items-center justify-center py-8 text-muted-foreground', className)}>
+      <div
+        className={cn(
+          'flex flex-col items-center justify-center py-8 text-muted-foreground',
+          className
+        )}
+      >
         <FileText className="mb-2 h-8 w-8 opacity-50" />
         <p className="text-sm">No content to display</p>
       </div>
@@ -210,9 +228,16 @@ export function SecureEmailRenderer({
   // Error state
   if (renderError || displayMode === 'error') {
     return (
-      <div className={cn('flex flex-col items-center justify-center rounded-lg border border-destructive/50 bg-destructive/10 p-4', className)}>
+      <div
+        className={cn(
+          'flex flex-col items-center justify-center rounded-lg border border-destructive/50 bg-destructive/10 p-4',
+          className
+        )}
+      >
         <AlertCircle className="mb-2 h-6 w-6 text-destructive" />
-        <p className="text-sm text-destructive">{renderError ?? 'Failed to render email content'}</p>
+        <p className="text-sm text-destructive">
+          {renderError ?? 'Failed to render email content'}
+        </p>
       </div>
     );
   }

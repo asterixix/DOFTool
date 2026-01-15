@@ -14,7 +14,35 @@ interface UseSyncStatusOptions {
   autoConnect?: boolean;
 }
 
-export function useSyncStatus({ familyId, autoConnect = true }: UseSyncStatusOptions = {}) {
+type SyncResult = ReturnType<typeof useSync>;
+
+interface UseSyncStatusResult {
+  status: SyncResult['status'];
+  peers: SyncResult['peers'];
+  discoveredPeers: SyncResult['discoveredPeers'];
+  peerCount: SyncResult['peerCount'];
+  lastSyncAt: SyncResult['lastSyncAt'];
+  error: SyncResult['error'];
+  isConnected: SyncResult['isConnected'];
+  statusText: SyncResult['statusText'];
+  isConnecting: boolean;
+  isSyncing: boolean;
+  isDiscovering: boolean;
+  isOffline: boolean;
+  connectedPeerCount: number;
+  totalPeerCount: number;
+  discoveredPeerCount: number;
+  refreshStatus: () => void;
+  refreshPeers: () => void;
+  forceSync: () => void;
+  startSync: () => void;
+  stopSync: () => void;
+}
+
+export function useSyncStatus({
+  familyId,
+  autoConnect = true,
+}: UseSyncStatusOptions = {}): UseSyncStatusResult {
   const {
     status,
     peers,
@@ -33,7 +61,9 @@ export function useSyncStatus({ familyId, autoConnect = true }: UseSyncStatusOpt
 
   // Auto-start sync when familyId is available
   useEffect(() => {
-    if (!autoConnect || !familyId) {return;}
+    if (!autoConnect || !familyId) {
+      return;
+    }
 
     // Sync service is started automatically in main process when family exists
     // Just refresh status to get current state
@@ -43,7 +73,9 @@ export function useSyncStatus({ familyId, autoConnect = true }: UseSyncStatusOpt
 
   // Periodic status refresh
   useEffect(() => {
-    if (status === 'offline') {return;}
+    if (status === 'offline') {
+      return;
+    }
 
     const interval = setInterval(() => {
       void refreshStatus();
@@ -73,10 +105,20 @@ export function useSyncStatus({ familyId, autoConnect = true }: UseSyncStatusOpt
     totalPeerCount: peers.length,
     discoveredPeerCount: discoveredPeers.length,
     // Actions
-    refreshStatus,
-    refreshPeers,
-    forceSync,
-    startSync,
-    stopSync,
+    refreshStatus: () => {
+      void refreshStatus();
+    },
+    refreshPeers: () => {
+      void refreshPeers();
+    },
+    forceSync: () => {
+      void forceSync();
+    },
+    startSync: () => {
+      void startSync();
+    },
+    stopSync: () => {
+      void stopSync();
+    },
   };
 }

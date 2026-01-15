@@ -299,7 +299,7 @@ export function TaskSidebar({
                         <ContextMenuSeparator />
                         <ContextMenuItem
                           className="text-destructive focus:text-destructive"
-                          onClick={async () => {
+                          onClick={() => {
                             if (
                               confirm(
                                 `Are you sure you want to delete "${list.name}"? This will also delete all tasks in this list.`

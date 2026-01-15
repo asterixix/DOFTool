@@ -17,7 +17,13 @@ type CompletionAction = 'create' | 'join' | 'skip' | 'next';
 export default function WelcomePage(): JSX.Element {
   const navigate = useNavigate();
   const { createFamily, joinFamily, isCreating, isJoining, error, clearError } = useFamily();
-  const { setFirstRunComplete, setOnboardingComplete, updateUserSettings, startTutorial, tutorial } = useSettingsStore();
+  const {
+    setFirstRunComplete,
+    setOnboardingComplete,
+    updateUserSettings,
+    startTutorial,
+    tutorial,
+  } = useSettingsStore();
 
   const completeSetup = (action: CompletionAction): void => {
     if (displayName.trim()) {
@@ -25,7 +31,7 @@ export default function WelcomePage(): JSX.Element {
     }
     setFirstRunComplete();
     setOnboardingComplete();
-    
+
     // Start tutorial for first-time users who haven't seen it
     if (!tutorial.hasSeenTutorial && action !== 'skip') {
       startTutorial();
@@ -102,20 +108,11 @@ export default function WelcomePage(): JSX.Element {
           </div>
 
           <div className="space-y-4">
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={handleNext}
-            >
+            <Button className="w-full" size="lg" onClick={handleNext}>
               Get Started
             </Button>
 
-            <Button
-              className="w-full"
-              size="lg"
-              variant="outline"
-              onClick={handleSkipSetup}
-            >
+            <Button className="w-full" size="lg" variant="outline" onClick={handleSkipSetup}>
               Skip Setup
             </Button>
           </div>
@@ -137,9 +134,7 @@ export default function WelcomePage(): JSX.Element {
             <DOFToolLogo className="h-16 w-16" />
           </div>
           <CardTitle className="text-2xl">Set Up Your Family</CardTitle>
-          <CardDescription>
-            Create a new family or join an existing one
-          </CardDescription>
+          <CardDescription>Create a new family or join an existing one</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -168,7 +163,7 @@ export default function WelcomePage(): JSX.Element {
             <div className="space-y-4">
               <div>
                 <h3 className="font-medium">Create a New Family</h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="mb-3 text-sm text-muted-foreground">
                   Start fresh with your own family space
                 </p>
                 <div className="space-y-2">
@@ -184,7 +179,7 @@ export default function WelcomePage(): JSX.Element {
                   />
                 </div>
                 <Button
-                  className="w-full mt-3"
+                  className="mt-3 w-full"
                   disabled={!familyName.trim() || isCreating}
                   onClick={() => void handleCreateFamily()}
                 >
@@ -196,7 +191,7 @@ export default function WelcomePage(): JSX.Element {
 
               <div>
                 <h3 className="font-medium">Join Existing Family</h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="mb-3 text-sm text-muted-foreground">
                   Enter an invite token from a family member
                 </p>
                 <div className="space-y-2">
@@ -212,7 +207,7 @@ export default function WelcomePage(): JSX.Element {
                   />
                 </div>
                 <Button
-                  className="w-full mt-3"
+                  className="mt-3 w-full"
                   disabled={!inviteToken.trim() || isJoining}
                   variant="outline"
                   onClick={() => void handleJoinFamily()}

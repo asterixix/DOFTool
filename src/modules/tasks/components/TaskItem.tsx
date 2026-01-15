@@ -3,7 +3,6 @@
  */
 
 import { cloneElement, forwardRef, useCallback, useState } from 'react';
-import type React from 'react';
 
 import { format } from 'date-fns';
 
@@ -150,6 +149,8 @@ const ContextMenuWrapper = forwardRef<HTMLDivElement, ContextMenuWrapperProps>(
     );
   }
 );
+
+ContextMenuWrapper.displayName = 'ContextMenuWrapper';
 
 export const TaskItem = forwardRef<HTMLDivElement, TaskItemProps>(
   (

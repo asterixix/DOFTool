@@ -141,9 +141,18 @@ interface EmailAPI {
     targetFolder: string
   ) => Promise<{ success: boolean }>;
   markAsRead: (accountId: string, uid: number, read: boolean) => Promise<{ success: boolean }>;
-  markAsStarred: (accountId: string, uid: number, starred: boolean) => Promise<{ success: boolean }>;
+  markAsStarred: (
+    accountId: string,
+    uid: number,
+    starred: boolean
+  ) => Promise<{ success: boolean }>;
   deleteMessage: (accountId: string, uid: number, folder: string) => Promise<{ success: boolean }>;
-  moveMessage: (accountId: string, uid: number, sourceFolder: string, targetFolder: string) => Promise<{ success: boolean }>;
+  moveMessage: (
+    accountId: string,
+    uid: number,
+    sourceFolder: string,
+    targetFolder: string
+  ) => Promise<{ success: boolean }>;
 }
 
 // Define the structure we expect from electronAPI for email labels

@@ -10,7 +10,6 @@ import { EventEmitter } from 'events';
 
 import * as Bonjour from 'bonjour-service';
 
-
 import { MDNS_SERVICE_TYPE, SYNC_PROTOCOL_VERSION } from './Sync.types';
 
 import type { DiscoveredPeer, SyncConfig } from './Sync.types';
@@ -28,7 +27,7 @@ interface DiscoveryConfig extends SyncConfig {
 interface DiscoveryServiceEvents {
   'peer-discovered': (peer: DiscoveredPeer) => void;
   'peer-lost': (deviceId: string) => void;
-  'error': (error: Error) => void;
+  error: (error: Error) => void;
 }
 
 export class DiscoveryService extends EventEmitter {
@@ -39,6 +38,10 @@ export class DiscoveryService extends EventEmitter {
   private familyIdHash: string = '';
   private discoveredPeers: Map<string, DiscoveredPeer> = new Map();
   private isRunning = false;
+
+  private isStoppable(service: Service | null): service is Service & { stop: () => void } {
+    return !!service && typeof (service as { stop?: unknown }).stop === 'function';
+  }
 
   constructor() {
     super();
@@ -98,7 +101,7 @@ export class DiscoveryService extends EventEmitter {
    */
   stopAdvertising(): void {
     const ad = this.advertisement;
-    if (ad && typeof ad.stop === 'function') {
+    if (this.isStoppable(ad)) {
       try {
         ad.stop();
       } catch (error) {
@@ -160,10 +163,14 @@ export class DiscoveryService extends EventEmitter {
    * Handle a service being discovered
    */
   private handleServiceUp(service: Service): void {
-    if (!this.config || !this.isRunning) {return;}
+    if (!this.config || !this.isRunning) {
+      return;
+    }
 
     const txt = service.txt as Record<string, string> | undefined;
-    if (!txt) {return;}
+    if (!txt) {
+      return;
+    }
 
     const familyIdHash = txt.fid;
     const deviceId = txt.did;
@@ -221,10 +228,14 @@ export class DiscoveryService extends EventEmitter {
    */
   private handleServiceDown(service: Service): void {
     const txt = service.txt as Record<string, string> | undefined;
-    if (!txt) {return;}
+    if (!txt) {
+      return;
+    }
 
     const deviceId = txt.did;
-    if (!deviceId) {return;}
+    if (!deviceId) {
+      return;
+    }
 
     if (this.discoveredPeers.has(deviceId)) {
       const peer = this.discoveredPeers.get(deviceId);

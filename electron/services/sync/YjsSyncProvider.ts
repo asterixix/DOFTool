@@ -63,11 +63,17 @@ export class YjsSyncProvider extends EventEmitter {
   private awareness: awarenessProtocol.Awareness | null = null;
   private peers: Map<string, SyncPeer> = new Map();
   private updateHandler: ((update: Uint8Array, origin: unknown) => void) | null = null;
-  private awarenessHandler: ((changes: { added: number[]; updated: number[]; removed: number[] }) => void) | null = null;
+  private awarenessHandler:
+    | ((changes: { added: number[]; updated: number[]; removed: number[] }) => void)
+    | null = null;
 
   // Debounced/throttled handlers
-  private debouncedBroadcastUpdate: ((() => void) & { cancel: () => void; flush: () => void }) | null = null;
-  private throttledBroadcastAwareness: (((encodedAwareness: Uint8Array) => void) & { cancel: () => void }) | null = null;
+  private debouncedBroadcastUpdate:
+    | ((() => void) & { cancel: () => void; flush: () => void })
+    | null = null;
+  private throttledBroadcastAwareness:
+    | (((encodedAwareness: Uint8Array) => void) & { cancel: () => void })
+    | null = null;
   private pendingUpdates: Uint8Array[] = [];
   private pendingBytes = 0;
 
@@ -99,10 +105,12 @@ export class YjsSyncProvider extends EventEmitter {
         // Queue update
         this.pendingUpdates.push(update);
         this.pendingBytes += update.byteLength;
-        
+
         // Force flush if memory limits exceeded
-        if (this.pendingUpdates.length >= SYNC_CONFIG.MAX_PENDING_UPDATES ||
-            this.pendingBytes >= SYNC_CONFIG.MAX_PENDING_BYTES) {
+        if (
+          this.pendingUpdates.length >= SYNC_CONFIG.MAX_PENDING_UPDATES ||
+          this.pendingBytes >= SYNC_CONFIG.MAX_PENDING_BYTES
+        ) {
           this.debouncedBroadcastUpdate?.flush();
         } else {
           this.debouncedBroadcastUpdate?.();
@@ -116,7 +124,9 @@ export class YjsSyncProvider extends EventEmitter {
    * Flush pending updates - merges multiple updates into one for efficiency
    */
   private flushPendingUpdates(): void {
-    if (this.pendingUpdates.length === 0) {return;}
+    if (this.pendingUpdates.length === 0) {
+      return;
+    }
 
     // Take ownership of pending updates and reset counters
     const updates = this.pendingUpdates;
@@ -143,12 +153,13 @@ export class YjsSyncProvider extends EventEmitter {
     }
   }
 
-
   /**
    * Set up awareness protocol with throttled updates
    */
   private setupAwareness(): void {
-    if (!this.awareness || !this.config) {return;}
+    if (!this.awareness || !this.config) {
+      return;
+    }
 
     // Set local awareness state
     this.awareness.setLocalState({
@@ -167,20 +178,25 @@ export class YjsSyncProvider extends EventEmitter {
 
     // Listen for awareness changes with throttling
     this.awarenessHandler = (changes) => {
-      if (!this.awareness) {return;}
+      if (!this.awareness) {
+        return;
+      }
 
       // Encode awareness update (fast operation)
-      const encodedAwareness = awarenessProtocol.encodeAwarenessUpdate(
-        this.awareness,
-        [...changes.added, ...changes.updated, ...changes.removed]
-      );
+      const encodedAwareness = awarenessProtocol.encodeAwarenessUpdate(this.awareness, [
+        ...changes.added,
+        ...changes.updated,
+        ...changes.removed,
+      ]);
 
       // Throttle the broadcast
       this.throttledBroadcastAwareness?.(encodedAwareness);
 
       // Emit event with current states (deferred to avoid blocking)
       setImmediate(() => {
-        if (!this.awareness) {return;}
+        if (!this.awareness) {
+          return;
+        }
         const states = new Map<number, AwarenessState>();
         this.awareness.getStates().forEach((state, clientId) => {
           states.set(clientId, state as AwarenessState);
@@ -235,10 +251,14 @@ export class YjsSyncProvider extends EventEmitter {
    * Start synchronization with a peer
    */
   private startSync(deviceId: string): void {
-    if (!this.ydoc) {return;}
+    if (!this.ydoc) {
+      return;
+    }
 
     const peer = this.peers.get(deviceId);
-    if (!peer) {return;}
+    if (!peer) {
+      return;
+    }
 
     this.emit('sync-started', deviceId);
 
@@ -269,15 +289,15 @@ export class YjsSyncProvider extends EventEmitter {
   /**
    * Process sync protocol message
    */
-  private processMessage(
-    deviceId: string,
-    type: SyncMessageType,
-    payload: Uint8Array
-  ): void {
-    if (!this.ydoc) {return;}
+  private processMessage(deviceId: string, type: SyncMessageType, payload: Uint8Array): void {
+    if (!this.ydoc) {
+      return;
+    }
 
     const peer = this.peers.get(deviceId);
-    if (!peer) {return;}
+    if (!peer) {
+      return;
+    }
 
     switch (type) {
       case 'SYNC_STEP_1':
@@ -306,7 +326,9 @@ export class YjsSyncProvider extends EventEmitter {
    * Handle sync step 1 (state vector from peer) - deferred to avoid blocking
    */
   private handleSyncStep1(deviceId: string, stateVector: Uint8Array): void {
-    if (!this.ydoc) {return;}
+    if (!this.ydoc) {
+      return;
+    }
 
     const ydoc = this.ydoc;
 
@@ -326,7 +348,9 @@ export class YjsSyncProvider extends EventEmitter {
    * Handle sync step 2 (missing updates from peer) - deferred to avoid blocking
    */
   private handleSyncStep2(deviceId: string, updates: Uint8Array): void {
-    if (!this.ydoc) {return;}
+    if (!this.ydoc) {
+      return;
+    }
 
     const ydoc = this.ydoc;
 
@@ -349,7 +373,9 @@ export class YjsSyncProvider extends EventEmitter {
    * Handle incremental update from peer - deferred to avoid blocking
    */
   private handleUpdate(deviceId: string, update: Uint8Array): void {
-    if (!this.ydoc) {return;}
+    if (!this.ydoc) {
+      return;
+    }
 
     const ydoc = this.ydoc;
 
@@ -369,13 +395,11 @@ export class YjsSyncProvider extends EventEmitter {
    * Handle awareness update from peer
    */
   private handleAwareness(encodedAwareness: Uint8Array): void {
-    if (!this.awareness) {return;}
+    if (!this.awareness) {
+      return;
+    }
 
-    awarenessProtocol.applyAwarenessUpdate(
-      this.awareness,
-      encodedAwareness,
-      'remote'
-    );
+    awarenessProtocol.applyAwarenessUpdate(this.awareness, encodedAwareness, 'remote');
   }
 
   /**
@@ -392,13 +416,11 @@ export class YjsSyncProvider extends EventEmitter {
   /**
    * Send a sync message to a specific peer
    */
-  private sendSyncMessage(
-    deviceId: string,
-    type: SyncMessageType,
-    payload: Uint8Array
-  ): void {
+  private sendSyncMessage(deviceId: string, type: SyncMessageType, payload: Uint8Array): void {
     const peer = this.peers.get(deviceId);
-    if (peer?.channel.readyState !== 'open') {return;}
+    if (peer?.channel.readyState !== 'open') {
+      return;
+    }
 
     const message: SyncMessage = {
       type,
@@ -413,7 +435,9 @@ export class YjsSyncProvider extends EventEmitter {
    * Update local awareness state
    */
   setAwarenessState(state: Partial<AwarenessState>): void {
-    if (!this.awareness || !this.config) {return;}
+    if (!this.awareness || !this.config) {
+      return;
+    }
 
     const currentState = this.awareness.getLocalState() as AwarenessState | null;
     this.awareness.setLocalState({
@@ -442,7 +466,9 @@ export class YjsSyncProvider extends EventEmitter {
    */
   getPeerStatus(deviceId: string): { synced: boolean; lastSyncAt: number | null } | undefined {
     const peer = this.peers.get(deviceId);
-    if (!peer) {return undefined;}
+    if (!peer) {
+      return undefined;
+    }
     return {
       synced: peer.synced,
       lastSyncAt: peer.lastSyncAt,

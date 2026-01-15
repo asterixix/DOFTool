@@ -5,22 +5,10 @@
 import { useState } from 'react';
 
 import { formatDistanceToNow } from 'date-fns';
-import {
-  RefreshCw,
-  Wifi,
-  WifiOff,
-  Monitor,
-  Smartphone,
-  Laptop,
-  Search,
-} from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff, Monitor, Smartphone, Laptop, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
@@ -30,8 +18,12 @@ import type { PeerInfo, DiscoveredPeerInfo } from '@/modules/sync';
 
 function getDeviceIcon(deviceName: string): typeof Monitor {
   const name = deviceName.toLowerCase();
-  if (name.includes('phone') || name.includes('mobile')) {return Smartphone;}
-  if (name.includes('laptop')) {return Laptop;}
+  if (name.includes('phone') || name.includes('mobile')) {
+    return Smartphone;
+  }
+  if (name.includes('laptop')) {
+    return Laptop;
+  }
   return Monitor;
 }
 
@@ -103,15 +95,15 @@ export function SyncStatusPopover(): JSX.Element {
     stopSync,
   } = useSyncStatus();
 
-  const handleForceSync = async (): Promise<void> => {
-    await forceSync();
+  const handleForceSync = (): void => {
+    forceSync();
   };
 
-  const handleToggleSync = async (): Promise<void> => {
+  const handleToggleSync = (): void => {
     if (isOffline) {
-      await startSync();
+      startSync();
     } else {
-      await stopSync();
+      stopSync();
     }
   };
 
@@ -126,9 +118,12 @@ export function SyncStatusPopover(): JSX.Element {
           className={cn(
             'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
             isConnected && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-            status === 'syncing' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-            status === 'discovering' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-            status === 'connecting' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+            status === 'syncing' &&
+              'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+            status === 'discovering' &&
+              'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+            status === 'connecting' &&
+              'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
             isOffline && 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
           )}
           type="button"

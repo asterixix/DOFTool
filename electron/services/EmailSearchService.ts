@@ -215,23 +215,25 @@ export class EmailSearchService {
     }
 
     try {
+      await Promise.resolve();
       // Perform search
       const results = this.searchIndex.search(query.query, {
         filter: (result) => {
+          const doc = this.documentsById.get(String(result.id));
           // Apply filters
-          if (query.accountId && result.accountId !== query.accountId) {
+          if (query.accountId && doc?.accountId !== query.accountId) {
             return false;
           }
-          if (query.folder && result.folder !== query.folder) {
+          if (query.folder && doc?.folder !== query.folder) {
             return false;
           }
-          if (query.from && !result.sender.toLowerCase().includes(query.from.toLowerCase())) {
+          if (query.from && !doc?.sender.toLowerCase().includes(query.from.toLowerCase())) {
             return false;
           }
-          if (query.dateFrom && result.date < query.dateFrom) {
+          if (query.dateFrom && (doc?.date ?? 0) < query.dateFrom) {
             return false;
           }
-          if (query.dateTo && result.date > query.dateTo) {
+          if (query.dateTo && (doc?.date ?? 0) > query.dateTo) {
             return false;
           }
           return true;
@@ -240,11 +242,14 @@ export class EmailSearchService {
       });
 
       // Convert to EmailSearchResult format
-      const searchResults: EmailSearchResult[] = results.map((result) => ({
-        messageId: result.id,
-        accountId: result.accountId ?? '',
-        score: result.score,
-      }));
+      const searchResults: EmailSearchResult[] = results.map((result) => {
+        const doc = this.documentsById.get(String(result.id));
+        return {
+          messageId: doc?.messageId ?? String(result.id),
+          accountId: doc?.accountId ?? '',
+          score: result.score,
+        };
+      });
 
       // Apply limit
       const limit = query.limit ?? 100;

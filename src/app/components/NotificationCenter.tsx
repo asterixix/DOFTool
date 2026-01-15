@@ -7,26 +7,17 @@
 import { useState } from 'react';
 
 import { formatDistanceToNow } from 'date-fns';
-import {
-  Bell,
-  BellOff,
-  Calendar,
-  CheckSquare,
-  Mail,
-  Settings,
-  Trash2,
-  Users,
-} from 'lucide-react';
+import { Bell, BellOff, Calendar, CheckSquare, Mail, Settings, Trash2, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useNotifications, type NotificationHistoryItem, type NotificationModule } from '@/hooks/useNotifications';
+import {
+  useNotifications,
+  type NotificationHistoryItem,
+  type NotificationModule,
+} from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 
 import type { LucideIcon } from 'lucide-react';
@@ -53,11 +44,16 @@ function NotificationItem({ item }: { item: NotificationHistoryItem }): JSX.Elem
       <div
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          item.module === 'calendar' && 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-          item.module === 'tasks' && 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-          item.module === 'email' && 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-          item.module === 'family' && 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
-          item.module === 'system' && 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+          item.module === 'calendar' &&
+            'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+          item.module === 'tasks' &&
+            'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+          item.module === 'email' &&
+            'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+          item.module === 'family' &&
+            'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
+          item.module === 'system' &&
+            'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
         )}
       >
         <Icon className="h-4 w-4" />
@@ -75,15 +71,8 @@ function NotificationItem({ item }: { item: NotificationHistoryItem }): JSX.Elem
 
 export function NotificationCenter(): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
-  const {
-    history,
-    preferences,
-    unreadCount,
-    isLoading,
-    clearHistory,
-    togglePaused,
-    markAsViewed,
-  } = useNotifications();
+  const { history, preferences, unreadCount, isLoading, clearHistory, togglePaused, markAsViewed } =
+    useNotifications();
 
   const handleOpenChange = (open: boolean): void => {
     setIsOpen(open);
@@ -166,9 +155,7 @@ export function NotificationCenter(): JSX.Element {
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Bell className="mb-2 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">No notifications yet</p>
-              <p className="mt-1 text-xs text-muted-foreground/75">
-                You&apos;ll see updates here
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground/75">You&apos;ll see updates here</p>
             </div>
           ) : (
             <div className="divide-y">

@@ -145,14 +145,18 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Toggle paused state
   const togglePaused = useCallback(async (): Promise<boolean> => {
-    if (!preferences) {return false;}
+    if (!preferences) {
+      return false;
+    }
     return updatePreferences({ paused: !preferences.paused });
   }, [preferences, updatePreferences]);
 
   // Toggle module enabled state
   const toggleModuleEnabled = useCallback(
     async (module: NotificationModule): Promise<boolean> => {
-      if (!preferences) {return false;}
+      if (!preferences) {
+        return false;
+      }
       const modulePrefs = preferences.modules[module];
       return updatePreferences({
         modules: {

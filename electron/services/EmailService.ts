@@ -298,12 +298,12 @@ export class EmailService {
     }
 
     const total = mailbox.exists;
-    
+
     // If mailbox is empty, return empty array
     if (total === 0) {
       return [];
     }
-    
+
     const start = Math.max(1, total - limit + 1);
 
     // Fetch messages in reverse order (newest first)
@@ -460,18 +460,19 @@ export class EmailService {
    */
   private decodeQuotedPrintable(text: string): string {
     return text
-      .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/=([0-9A-F]{2})/gi, (_: string, hex: string) =>
+        String.fromCharCode(Number.parseInt(hex, 16))
+      )
       .replace(/=\r?\n/g, ''); // Remove soft line breaks
   }
 
-  
   /**
    * Parse raw email message to extract HTML and text body
    * Handles nested multipart MIME structures recursively
    */
   private parseRawMessage(rawMessage: string): { html?: string; text?: string } {
     console.log('EmailService: parseRawMessage input length:', rawMessage.length);
-    
+
     const result: { html?: string; text?: string } = {};
     const cidMap = new Map<string, string>();
 
@@ -481,16 +482,19 @@ export class EmailService {
     // Replace CID references in HTML with data URLs
     if (result.html && cidMap.size > 0) {
       for (const [cid, dataUrl] of cidMap.entries()) {
-        result.html = result.html.replace(new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), dataUrl);
+        result.html = result.html.replace(
+          new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'),
+          dataUrl
+        );
       }
     }
 
     console.log('EmailService: Parsed result:', {
       hasHtml: !!result.html,
       hasText: !!result.text,
-      htmlLength: result.html?.length || 0,
-      textLength: result.text?.length || 0,
-      cidCount: cidMap.size
+      htmlLength: result.html?.length ?? 0,
+      textLength: result.text?.length ?? 0,
+      cidCount: cidMap.size,
     });
 
     return result;
@@ -518,7 +522,7 @@ export class EmailService {
     const headerObj: Record<string, string> = {};
     let currentHeader = '';
     let currentValue = '';
-    
+
     for (const line of headers.split(/\r?\n/)) {
       if (line.match(/^\s/) && currentHeader) {
         // Continuation of previous header
@@ -548,8 +552,10 @@ export class EmailService {
       const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/i);
       if (boundaryMatch) {
         const boundary = boundaryMatch[1];
-        const parts = body.split(new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
-        
+        const parts = body.split(
+          new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
+        );
+
         for (const subPart of parts) {
           const trimmed = subPart.trim();
           // Skip empty parts and end boundary
@@ -841,37 +847,34 @@ export class EmailService {
     const parseRecipientList = (
       list: Array<string | { name?: string; address: string }> | undefined,
       label: 'to' | 'cc' | 'bcc'
-    ) => {
+    ): Array<{ name: string; address: string }> | undefined => {
       if (!list) {
         return undefined;
       }
 
-      const parsed = list
-        .flatMap((raw, index) => {
-          if (typeof raw === 'string') {
-            const trimmed = raw.trim();
-            if (!trimmed) {
-              return [];
-            }
-            const entries = addressparser(trimmed) as AddressOrGroup[];
-            if (!entries.length) {
-              throw new Error(`Invalid ${label} address at index ${index}`);
-            }
-            return flattenAddressEntries(entries, label, index);
+      const parsed = list.flatMap((raw, index) => {
+        if (typeof raw === 'string') {
+          const trimmed = raw.trim();
+          if (!trimmed) {
+            return [];
           }
-
-          const address = typeof raw.address === 'string' ? raw.address.trim() : '';
-          if (!address) {
+          const entries = addressparser(trimmed);
+          if (!entries.length) {
             throw new Error(`Invalid ${label} address at index ${index}`);
           }
+          return flattenAddressEntries(entries, label, index);
+        }
 
-          const name =
-            typeof raw.name === 'string' && raw.name.trim().length > 0
-              ? raw.name.trim()
-              : address;
+        const address = typeof raw.address === 'string' ? raw.address.trim() : '';
+        if (!address) {
+          throw new Error(`Invalid ${label} address at index ${index}`);
+        }
 
-          return [{ name, address }];
-        });
+        const name =
+          typeof raw.name === 'string' && raw.name.trim().length > 0 ? raw.name.trim() : address;
+
+        return [{ name, address }];
+      });
 
       if (!parsed.length) {
         throw new Error(`No valid ${label} addresses provided`);
@@ -1061,7 +1064,9 @@ export class EmailService {
     } catch (error) {
       console.error('Failed to delete folder:', error);
       if (error instanceof Error && error.message.includes('DELETE failed')) {
-        throw new Error(`Cannot delete folder '${folderPath}'. It may not exist or be a system folder.`);
+        throw new Error(
+          `Cannot delete folder '${folderPath}'. It may not exist or be a system folder.`
+        );
       }
       throw error;
     }

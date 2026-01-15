@@ -347,7 +347,7 @@ function TasksPage(): JSX.Element {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-4 h-full p-4">
+    <div className="flex h-full flex-1 flex-col gap-4 p-4">
       {/* Error display */}
       <ErrorBanner error={error} onDismiss={clearError} />
 

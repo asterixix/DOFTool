@@ -12,6 +12,9 @@ import { CheckCircle2, Circle, Inbox, Mail, MailOpen, Paperclip, Star } from 'lu
 import { cn } from '@/lib/utils';
 import { EmptyState, LoadingSpinner } from '@/shared/components';
 
+import { useEmailPreferencesStore } from '../stores/emailPreferences.store';
+import { generatePreview } from '../utils/sanitize';
+
 import type { EmailMessage, EmailThread } from '../types/Email.types';
 
 interface MessageListProps {
@@ -53,6 +56,8 @@ function MessageRow({
   message,
   isSelected,
   isChecked,
+  showSnippets,
+  snippetLines,
   onSelect,
   onToggleStar,
   onToggleRead,
@@ -64,6 +69,8 @@ function MessageRow({
   message: EmailMessage;
   isSelected: boolean;
   isChecked: boolean;
+  showSnippets: boolean;
+  snippetLines: 1 | 2 | 3;
   onSelect: () => void;
   onToggleStar: (starred: boolean) => void;
   onToggleRead: (read: boolean) => void;
@@ -72,6 +79,11 @@ function MessageRow({
   onDragEnd: () => void;
   isDragging: boolean;
 }): JSX.Element {
+  const previewText = useMemo(() => {
+    const source = message.textBody?.trim() ?? message.htmlBody?.trim() ?? message.snippet;
+    return generatePreview(source);
+  }, [message.htmlBody, message.snippet, message.textBody]);
+
   const handleStarClick = (e: React.MouseEvent): void => {
     e.stopPropagation();
     onToggleStar(!message.starred);
@@ -169,7 +181,18 @@ function MessageRow({
             <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
         </div>
-        <p className="truncate text-sm text-muted-foreground">{message.snippet}</p>
+        {showSnippets && (
+          <p
+            className={cn(
+              'text-sm text-muted-foreground',
+              snippetLines === 1 && 'line-clamp-1',
+              snippetLines === 2 && 'line-clamp-2',
+              snippetLines === 3 && 'line-clamp-3'
+            )}
+          >
+            {previewText}
+          </p>
+        )}
       </div>
 
       {/* Date */}
@@ -184,15 +207,21 @@ function ThreadRow({
   thread,
   isSelected,
   isChecked,
+  showSnippets,
+  snippetLines,
   onSelect,
   onCheckChange,
 }: {
   thread: EmailThread;
   isSelected: boolean;
   isChecked: boolean;
+  showSnippets: boolean;
+  snippetLines: 1 | 2 | 3;
   onSelect: () => void;
   onCheckChange: (checked: boolean) => void;
 }): JSX.Element {
+  const previewText = useMemo(() => generatePreview(thread.snippet ?? ''), [thread.snippet]);
+
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -274,7 +303,18 @@ function ThreadRow({
             <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
         </div>
-        <p className="truncate text-sm text-muted-foreground">{thread.snippet}</p>
+        {showSnippets && (
+          <p
+            className={cn(
+              'text-sm text-muted-foreground',
+              snippetLines === 1 && 'line-clamp-1',
+              snippetLines === 2 && 'line-clamp-2',
+              snippetLines === 3 && 'line-clamp-3'
+            )}
+          >
+            {previewText}
+          </p>
+        )}
       </div>
 
       {/* Participant count */}
@@ -304,6 +344,7 @@ export function MessageList({
   selectedIds,
   isLoading,
 }: MessageListProps): JSX.Element {
+  const displayPreferences = useEmailPreferencesStore((state) => state.preferences.display);
   const parentRef = useRef<HTMLDivElement>(null);
 
   const items = useMemo(() => {
@@ -381,6 +422,8 @@ export function MessageList({
                 <ThreadRow
                   isChecked={selectedIds.includes(thread.id)}
                   isSelected={selectedThreadId === thread.id}
+                  showSnippets={displayPreferences.showSnippets}
+                  snippetLines={displayPreferences.snippetLines}
                   thread={thread}
                   onCheckChange={(checked) => handleCheckChange(thread.id, checked)}
                   onSelect={() => onThreadSelect(thread.id)}
@@ -407,6 +450,8 @@ export function MessageList({
                 isDragging={false}
                 isSelected={selectedMessageId === message.id}
                 message={message}
+                showSnippets={displayPreferences.showSnippets}
+                snippetLines={displayPreferences.snippetLines}
                 onCheckChange={(checked) => handleCheckChange(message.id, checked)}
                 onDragEnd={() => {}}
                 onDragStart={() => {}}

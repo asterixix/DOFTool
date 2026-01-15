@@ -15,11 +15,11 @@ interface HeaderProps {
   onToggleCollapse?: () => void;
 }
 
-export function Header({ 
-  isMobile = false, 
+export function Header({
+  isMobile = false,
   isSidebarCollapsed = false,
-  onToggleSidebar, 
-  onToggleCollapse 
+  onToggleSidebar,
+  onToggleCollapse,
 }: HeaderProps): JSX.Element {
   const breadcrumbs = useBreadcrumbs();
 
@@ -38,11 +38,11 @@ export function Header({
           </button>
         ) : onToggleCollapse ? (
           <Button
-            variant="ghost"
-            size="sm"
             className="h-10 w-10 p-0"
-            onClick={onToggleCollapse}
+            size="sm"
             title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            variant="ghost"
+            onClick={onToggleCollapse}
           >
             {isSidebarCollapsed ? (
               <ChevronRight className="h-5 w-5" />

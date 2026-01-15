@@ -180,8 +180,8 @@ export function FolderManager({
         throw new Error('Email API not available');
       }
       await emailAPI.deleteFolder(
-        accountId, 
-        deletingFolder.path, 
+        accountId,
+        deletingFolder.path,
         moveToFolder && moveToFolder !== '__delete__' ? moveToFolder : undefined
       );
       setDeletingFolder(null);

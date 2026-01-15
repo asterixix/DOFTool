@@ -547,11 +547,24 @@ const electronAPI = {
       ipcRenderer.invoke('email:folders:move', accountId, messageUids, sourceFolder, targetFolder),
     markAsRead: (accountId: string, uid: number, read: boolean): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('email:markAsRead', accountId, uid, read),
-    markAsStarred: (accountId: string, uid: number, starred: boolean): Promise<{ success: boolean }> =>
+    markAsStarred: (
+      accountId: string,
+      uid: number,
+      starred: boolean
+    ): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('email:markAsStarred', accountId, uid, starred),
-    deleteMessage: (accountId: string, uid: number, folder: string): Promise<{ success: boolean }> =>
+    deleteMessage: (
+      accountId: string,
+      uid: number,
+      folder: string
+    ): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('email:deleteMessage', accountId, uid, folder),
-    moveMessage: (accountId: string, uid: number, sourceFolder: string, targetFolder: string): Promise<{ success: boolean }> =>
+    moveMessage: (
+      accountId: string,
+      uid: number,
+      sourceFolder: string,
+      targetFolder: string
+    ): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('email:moveMessage', accountId, uid, sourceFolder, targetFolder),
   },
 
@@ -621,7 +634,8 @@ const electronAPI = {
       lastSyncAt: number | null;
       error?: string;
     }> => ipcRenderer.invoke('sync:status'),
-    forceSync: (): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('sync:force'),
+    forceSync: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('sync:force'),
     getPeers: (): Promise<
       Array<{
         deviceId: string;

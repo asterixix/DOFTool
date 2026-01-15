@@ -24,8 +24,7 @@ export const TUTORIAL_CONTENT: TutorialStepContent[] = [
   {
     id: 'calendar',
     title: 'Calendar',
-    description:
-      'Keep track of family events, appointments, and important dates all in one place.',
+    description: 'Keep track of family events, appointments, and important dates all in one place.',
     icon: Calendar,
     features: [
       'Shared family calendar with color coding',
@@ -38,8 +37,7 @@ export const TUTORIAL_CONTENT: TutorialStepContent[] = [
   {
     id: 'tasks',
     title: 'Tasks',
-    description:
-      'Manage household tasks, assign responsibilities, and track progress together.',
+    description: 'Manage household tasks, assign responsibilities, and track progress together.',
     icon: CheckSquare,
     features: [
       'Create task lists for different categories',
@@ -52,8 +50,7 @@ export const TUTORIAL_CONTENT: TutorialStepContent[] = [
   {
     id: 'email',
     title: 'Email',
-    description:
-      'Connect email accounts and communicate privately within your family.',
+    description: 'Connect email accounts and communicate privately within your family.',
     icon: Mail,
     features: [
       'Connect IMAP email accounts',
@@ -66,8 +63,7 @@ export const TUTORIAL_CONTENT: TutorialStepContent[] = [
   {
     id: 'family',
     title: 'Family',
-    description:
-      'Manage your family group, invite members, and control permissions.',
+    description: 'Manage your family group, invite members, and control permissions.',
     icon: Users,
     features: [
       'Invite family members via secure QR code',

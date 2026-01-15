@@ -25,8 +25,8 @@ interface SignalingServiceEvents {
   'message-received': (message: SignalingMessage, respond: (msg: SignalingMessage) => void) => void;
   'client-connected': (deviceId: string) => void;
   'client-disconnected': (deviceId: string) => void;
-  'error': (error: Error) => void;
-  'listening': (port: number) => void;
+  error: (error: Error) => void;
+  listening: (port: number) => void;
 }
 
 /** Pending connection info */
@@ -230,7 +230,7 @@ export class SignalingService extends EventEmitter {
   /**
    * Send a signaling message to a specific device
    */
-  async sendTo(deviceId: string, message: SignalingMessage): Promise<void> {
+  sendTo(deviceId: string, message: SignalingMessage): void {
     const socket = this.connections.get(deviceId);
     if (!socket) {
       throw new Error(`No connection to device: ${deviceId}`);

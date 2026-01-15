@@ -31,6 +31,7 @@ function handleLibsodium(): Plugin {
 
 // Track if Electron is starting to prevent multiple instances
 let isStarting = false;
+const shouldAutoStartElectron = process.env.ELECTRON_AUTO_START === 'true';
 
 export default defineConfig({
 	plugins: [
@@ -39,20 +40,24 @@ export default defineConfig({
     electron([
       {
         entry: 'electron/main.ts',
-        onstart(options) {
-          // Prevent multiple Electron instances from starting
-          if (isStarting) {
-            console.log('Electron is already starting, skipping...');
-            return;
-          }
-          isStarting = true;
-          // Add delay to let previous instance fully close and release lock
-          setTimeout(() => {
-            options.startup();
-            // Reset flag after a delay to allow future restarts
-            setTimeout(() => { isStarting = false; }, 3000);
-          }, 1000);
-        },
+				onstart(options) {
+					if (!shouldAutoStartElectron) {
+						console.log('Electron auto-start disabled (ELECTRON_AUTO_START=false).');
+						return;
+					}
+					// Prevent multiple Electron instances from starting
+					if (isStarting) {
+						console.log('Electron is already starting, skipping...');
+						return;
+					}
+					isStarting = true;
+					// Add delay to let previous instance fully close and release lock
+					setTimeout(() => {
+						options.startup();
+						// Reset flag after a delay to allow future restarts
+						setTimeout(() => { isStarting = false; }, 3000);
+					}, 1000);
+				},
 			vite: {
 				build: {
 					outDir: 'dist/electron',

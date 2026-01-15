@@ -37,25 +37,30 @@ export function useResizablePanel({
     }
     return defaultWidth;
   });
-  
+
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    
-    const deltaX = e.clientX - startXRef.current;
-    const newWidth = startWidthRef.current + deltaX;
-    
-    if (newWidth >= minWidth && newWidth <= maxWidth) {
-      setWidth(newWidth);
-      if (storageKey) {
-        localStorage.setItem(storageKey, newWidth.toString());
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) {
+        return;
       }
-    }
-  }, [isResizing, minWidth, maxWidth, storageKey]);
+
+      const deltaX = e.clientX - startXRef.current;
+      const newWidth = startWidthRef.current + deltaX;
+
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setWidth(newWidth);
+        if (storageKey) {
+          localStorage.setItem(storageKey, newWidth.toString());
+        }
+      }
+    },
+    [isResizing, minWidth, maxWidth, storageKey]
+  );
 
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
@@ -69,7 +74,7 @@ export function useResizablePanel({
       document.addEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
-      
+
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
@@ -77,18 +82,21 @@ export function useResizablePanel({
         document.body.style.userSelect = '';
       };
     }
-    
+
     return undefined;
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    startXRef.current = e.clientX;
-    startWidthRef.current = width;
-    setIsResizing(true);
-  }, [width]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      startXRef.current = e.clientX;
+      startWidthRef.current = width;
+      setIsResizing(true);
+    },
+    [width]
+  );
 
   return {
     width,

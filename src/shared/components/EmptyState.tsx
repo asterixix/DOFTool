@@ -3,7 +3,6 @@
  * Displays when no data is available with optional action button
  */
 
-
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 

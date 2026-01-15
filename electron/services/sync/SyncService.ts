@@ -40,7 +40,7 @@ interface SyncServiceEvents {
   'sync-completed': () => void;
   'sync-error': (error: Error) => void;
   'awareness-update': (states: Map<number, AwarenessState>) => void;
-  'error': (error: Error) => void;
+  error: (error: Error) => void;
 }
 
 export class SyncService extends EventEmitter {
@@ -115,7 +115,7 @@ export class SyncService extends EventEmitter {
     });
 
     // Initialize peer connection service
-    await this.peerConnectionService.initialize({
+    this.peerConnectionService.initialize({
       deviceId: config.deviceId,
       deviceName: config.deviceName,
     });
@@ -153,7 +153,7 @@ export class SyncService extends EventEmitter {
 
     // Signaling events
     this.signalingService.on('message-received', (message, respond) => {
-      this.handleSignalingMessage(message, respond);
+      void this.handleSignalingMessage(message, respond);
     });
 
     // Peer connection events
@@ -170,7 +170,7 @@ export class SyncService extends EventEmitter {
     });
 
     this.peerConnectionService.on('ice-candidate', (deviceId, candidate) => {
-      this.handleIceCandidate(deviceId, candidate);
+      void this.handleIceCandidate(deviceId, candidate);
     });
 
     this.peerConnectionService.on('authenticated', (deviceId) => {
@@ -197,7 +197,9 @@ export class SyncService extends EventEmitter {
    * Start the sync service
    */
   start(): void {
-    if (this.isRunning) {return;}
+    if (this.isRunning) {
+      return;
+    }
 
     if (!this.config || !this.ydoc) {
       console.error('[SyncService] Cannot start: not initialized');
@@ -217,7 +219,9 @@ export class SyncService extends EventEmitter {
    * Stop the sync service
    */
   stop(): void {
-    if (!this.isRunning) {return;}
+    if (!this.isRunning) {
+      return;
+    }
 
     this.isRunning = false;
 
@@ -241,7 +245,7 @@ export class SyncService extends EventEmitter {
 
     // Initiate connection if not already connecting
     if (!this.pendingConnections.has(peer.deviceId)) {
-      this.initiateConnection(peer);
+      void this.initiateConnection(peer);
     }
   }
 
@@ -263,7 +267,9 @@ export class SyncService extends EventEmitter {
    * Initiate connection to a discovered peer
    */
   private async initiateConnection(peer: DiscoveredPeer): Promise<void> {
-    if (!this.config) {return;}
+    if (!this.config) {
+      return;
+    }
 
     // Use device ID comparison to determine who initiates
     // Higher ID initiates to prevent both sides trying simultaneously
@@ -288,7 +294,7 @@ export class SyncService extends EventEmitter {
         offer,
         '' // TODO: Add signature
       );
-      await this.signalingService.sendTo(peer.deviceId, offerMessage);
+      this.signalingService.sendTo(peer.deviceId, offerMessage);
     } catch (error) {
       console.error(`[SyncService] Failed to initiate connection to ${peer.deviceName}:`, error);
       this.pendingConnections.delete(peer.deviceId);
@@ -302,10 +308,14 @@ export class SyncService extends EventEmitter {
     message: SignalingMessage,
     respond: (msg: SignalingMessage) => void
   ): Promise<void> {
-    if (!this.config) {return;}
+    if (!this.config) {
+      return;
+    }
 
     // Ignore messages not for us
-    if (message.to !== this.config.deviceId) {return;}
+    if (message.to !== this.config.deviceId) {
+      return;
+    }
 
     const peer = this.discoveryService.getPeer(message.from);
 
@@ -384,11 +394,10 @@ export class SyncService extends EventEmitter {
   /**
    * Handle local ICE candidate to send to peer
    */
-  private async handleIceCandidate(
-    deviceId: string,
-    candidate: RTCIceCandidateInit
-  ): Promise<void> {
-    if (!this.signalingService.isConnectedTo(deviceId)) {return;}
+  private handleIceCandidate(deviceId: string, candidate: RTCIceCandidateInit): void {
+    if (!this.signalingService.isConnectedTo(deviceId)) {
+      return;
+    }
 
     const message = this.signalingService.createIceCandidateMessage(
       deviceId,
@@ -397,7 +406,7 @@ export class SyncService extends EventEmitter {
     );
 
     try {
-      await this.signalingService.sendTo(deviceId, message);
+      this.signalingService.sendTo(deviceId, message);
     } catch (error) {
       console.error('[SyncService] Failed to send ICE candidate:', error);
     }
@@ -406,10 +415,7 @@ export class SyncService extends EventEmitter {
   /**
    * Handle connection state change
    */
-  private handleConnectionStateChanged(
-    deviceId: string,
-    status: string
-  ): void {
+  private handleConnectionStateChanged(deviceId: string, status: string): void {
     console.error(`[SyncService] Connection state for ${deviceId}: ${status}`);
 
     if (status === 'connected') {
@@ -497,8 +503,9 @@ export class SyncService extends EventEmitter {
    * Get list of connected peers
    */
   getConnectedPeers(): PeerConnection[] {
-    return this.peerConnectionService.getAllConnections()
-      .filter(conn => conn.status === 'connected');
+    return this.peerConnectionService
+      .getAllConnections()
+      .filter((conn) => conn.status === 'connected');
   }
 
   /**
@@ -558,10 +565,7 @@ export class SyncService extends EventEmitter {
   }
 
   // Type-safe event methods
-  override on<K extends keyof SyncServiceEvents>(
-    event: K,
-    listener: SyncServiceEvents[K]
-  ): this {
+  override on<K extends keyof SyncServiceEvents>(event: K, listener: SyncServiceEvents[K]): this {
     return super.on(event, listener as (...args: unknown[]) => void);
   }
 
@@ -572,10 +576,7 @@ export class SyncService extends EventEmitter {
     return super.emit(event, ...args);
   }
 
-  override off<K extends keyof SyncServiceEvents>(
-    event: K,
-    listener: SyncServiceEvents[K]
-  ): this {
+  override off<K extends keyof SyncServiceEvents>(event: K, listener: SyncServiceEvents[K]): this {
     return super.off(event, listener as (...args: unknown[]) => void);
   }
 }

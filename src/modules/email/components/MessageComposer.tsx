@@ -235,7 +235,7 @@ export function MessageComposer({
       } else {
         const date = new Date(replyTo.date).toLocaleString();
         const senderName = replyTo.from.name ?? replyTo.from.address;
-        
+
         // Use text body if available, otherwise extract text from HTML
         let quotedContent = replyTo.textBody ?? '';
         if (!quotedContent && replyTo.htmlBody) {
@@ -244,20 +244,23 @@ export function MessageComposer({
           tempDiv.innerHTML = replyTo.htmlBody;
           quotedContent = tempDiv.textContent ?? tempDiv.innerText ?? '';
         }
-        
+
         // Clean up the quoted content - remove excessive whitespace and URLs from images
         quotedContent = quotedContent
-          .replace(/View image: \(https?:\/\/[^\)]+\)/gi, '[Image]')
-          .replace(/Follow image link: \(https?:\/\/[^\)]+\)/gi, '')
+          .replace(/View image: \(https?:\/\/[^)]+\)/gi, '[Image]')
+          .replace(/Follow image link: \(https?:\/\/[^)]+\)/gi, '')
           .replace(/Caption:=[^\n]*/gi, '')
           .replace(/\n{3,}/g, '\n\n')
           .trim();
-        
+
         // Format the quote with proper line prefix
-        const quotedLines = quotedContent.split('\n').map(line => `> ${line}`).join('\n');
-        
+        const quotedLines = quotedContent
+          .split('\n')
+          .map((line) => `> ${line}`)
+          .join('\n');
+
         if (mode === 'forward') {
-          const forwardHeader = `---------- Forwarded message ----------\nFrom: ${senderName} <${replyTo.from.address}>\nDate: ${date}\nSubject: ${replyTo.subject}\nTo: ${replyTo.to.map(r => r.address).join(', ')}\n\n`;
+          const forwardHeader = `---------- Forwarded message ----------\nFrom: ${senderName} <${replyTo.from.address}>\nDate: ${date}\nSubject: ${replyTo.subject}\nTo: ${replyTo.to.map((r) => r.address).join(', ')}\n\n`;
           setBody(`\n\n${forwardHeader}${quotedContent}`);
         } else {
           setBody(`\n\nOn ${date}, ${senderName} wrote:\n${quotedLines}`);

@@ -263,7 +263,7 @@ export function useTasks(): UseTasksReturn {
           const result = await tasksAPI.getTasks(lid);
           // Map API response to Task type
           // TODO: Update when IPC returns proper types
-          const listTasks: Task[] = (result).map((task: unknown) => {
+          const listTasks: Task[] = result.map((task: unknown) => {
             const t = task as Record<string, unknown>;
             return {
               id: String(t['id'] ?? ''),

@@ -10,8 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settings.store';
 
-import type { TutorialOverlayProps } from './Tutorial.types';
 import { TUTORIAL_CONTENT, getTutorialProgress } from './tutorialContent';
+
+import type { TutorialOverlayProps } from './Tutorial.types';
 
 export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Element | null {
   const { tutorial, nextTutorialStep, skipTutorial } = useSettingsStore();
@@ -49,7 +50,7 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
         key="tutorial-overlay"
         animate={{ opacity: 1 }}
         className={cn(
-          'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4',
+          'fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm',
           className
         )}
         exit={{ opacity: 0 }}
@@ -62,7 +63,7 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.2 }}
         >
-          <Card className="w-full max-w-lg relative">
+          <Card className="relative w-full max-w-lg">
             {/* Close button */}
             <Button
               aria-label="Skip tutorial"
@@ -74,17 +75,15 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
               <X className="h-4 w-4" />
             </Button>
 
-            <CardHeader className="text-center pb-2">
+            <CardHeader className="pb-2 text-center">
               {/* Progress indicator */}
-              <div className="flex justify-center gap-1.5 mb-4">
+              <div className="mb-4 flex justify-center gap-1.5">
                 {TUTORIAL_CONTENT.map((step, index) => (
                   <div
                     key={step.id}
                     className={cn(
                       'h-1.5 w-8 rounded-full transition-colors duration-300',
-                      index < progress.current
-                        ? 'bg-primary'
-                        : 'bg-muted'
+                      index < progress.current ? 'bg-primary' : 'bg-muted'
                     )}
                   />
                 ))}
@@ -96,7 +95,7 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
               </div>
 
               <CardTitle className="text-2xl">{stepContent.title}</CardTitle>
-              <CardDescription className="text-base mt-2">
+              <CardDescription className="mt-2 text-base">
                 {stepContent.description}
               </CardDescription>
             </CardHeader>
@@ -112,7 +111,7 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
                     initial={{ opacity: 0, x: -10 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    <div className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
                     <span className="text-sm text-muted-foreground">{feature}</span>
                   </motion.li>
                 ))}
@@ -121,7 +120,7 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
               {/* Tip */}
               {stepContent.tip && (
                 <div className="flex items-start gap-3 rounded-lg bg-accent/50 p-3">
-                  <Lightbulb className="h-5 w-5 text-brand-accent shrink-0 mt-0.5" />
+                  <Lightbulb className="text-brand-accent mt-0.5 h-5 w-5 shrink-0" />
                   <p className="text-sm text-muted-foreground">{stepContent.tip}</p>
                 </div>
               )}
@@ -133,7 +132,7 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
                   variant="ghost"
                   onClick={handlePrevious}
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="mr-2 h-4 w-4" />
                   Back
                 </Button>
 
@@ -147,7 +146,7 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
                   ) : (
                     <>
                       Next
-                      <ArrowRight className="h-4 w-4 ml-2" />
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   )}
                 </Button>

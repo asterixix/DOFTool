@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -48,7 +54,7 @@ export default function SettingsPage(): JSX.Element {
   };
 
   return (
-    <div className="space-y-6 h-full p-4">
+    <div className="h-full space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Configure your {BRAND.name} preferences</p>
@@ -95,7 +101,7 @@ export default function SettingsPage(): JSX.Element {
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 {tutorial.hasSeenTutorial
-                  ? 'You\'ve completed the tutorial. Want to see it again?'
+                  ? "You've completed the tutorial. Want to see it again?"
                   : 'Take a guided tour of all the features.'}
               </p>
               <Button
@@ -105,7 +111,7 @@ export default function SettingsPage(): JSX.Element {
                   startTutorial();
                 }}
               >
-                <BookOpen className="h-4 w-4 mr-2" />
+                <BookOpen className="mr-2 h-4 w-4" />
                 {tutorial.hasSeenTutorial ? 'Restart Tutorial' : 'Start Tutorial'}
               </Button>
             </CardContent>
@@ -136,9 +142,7 @@ export default function SettingsPage(): JSX.Element {
                 <Label>Theme Mode</Label>
                 <Select
                   value={appearance.theme}
-                  onValueChange={(value: ThemeMode) =>
-                    updateAppearanceSettings({ theme: value })
-                  }
+                  onValueChange={(value: ThemeMode) => updateAppearanceSettings({ theme: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -154,9 +158,7 @@ export default function SettingsPage(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Reduced Motion</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Reduce animations and transitions
-                  </p>
+                  <p className="text-sm text-muted-foreground">Reduce animations and transitions</p>
                 </div>
                 <Switch
                   checked={appearance.reducedMotion}
@@ -169,9 +171,7 @@ export default function SettingsPage(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Compact Mode</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Use more compact layout
-                  </p>
+                  <p className="text-sm text-muted-foreground">Use more compact layout</p>
                 </div>
                 <Switch
                   checked={appearance.compactMode}
@@ -257,11 +257,13 @@ export default function SettingsPage(): JSX.Element {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Intl.supportedValuesOf('timeZone').slice(0, 10).map((tz) => (
-                      <SelectItem key={tz} value={tz}>
-                        {tz}
-                      </SelectItem>
-                    ))}
+                    {Intl.supportedValuesOf('timeZone')
+                      .slice(0, 10)
+                      .map((tz) => (
+                        <SelectItem key={tz} value={tz}>
+                          {tz}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -280,9 +282,7 @@ export default function SettingsPage(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Enable Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Turn notifications on or off
-                  </p>
+                  <p className="text-sm text-muted-foreground">Turn notifications on or off</p>
                 </div>
                 <Switch
                   checked={notifications.enabled}
@@ -295,9 +295,7 @@ export default function SettingsPage(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Sound Effects</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Play sound for notifications
-                  </p>
+                  <p className="text-sm text-muted-foreground">Play sound for notifications</p>
                 </div>
                 <Switch
                   checked={notifications.soundEnabled}
@@ -310,9 +308,7 @@ export default function SettingsPage(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Task Reminders</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Get reminded about upcoming tasks
-                  </p>
+                  <p className="text-sm text-muted-foreground">Get reminded about upcoming tasks</p>
                 </div>
                 <Switch
                   checked={notifications.taskReminders}

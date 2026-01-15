@@ -217,7 +217,7 @@ export class YjsService {
       // This might also throw a lock error if the database is still locked
       try {
         this.ydoc = await this.persistence.getYDoc(docName);
-        
+
         // Enable garbage collection to reduce memory usage
         if (MEMORY_CONFIG.ENABLE_GC) {
           this.ydoc.gc = true;
@@ -454,19 +454,23 @@ export class YjsService {
    * Run garbage collection on the Yjs document
    */
   private runGarbageCollection(): void {
-    if (!this.ydoc) {return;}
+    if (!this.ydoc) {
+      return;
+    }
 
     try {
       // Yjs automatically garbage collects when gc=true
       // We can force a manual GC by accessing the document state
       const clientCount = this.ydoc.store.clients.size;
       const deleteSetSize = this.ydoc.store.pendingDs?.length ?? 0;
-      
+
       // Log memory stats periodically (every 5 GC cycles = 5 minutes)
       if (Math.random() < 0.2) {
-        console.error(`[YjsService] GC stats: ${clientCount} clients, ${deleteSetSize} pending deletes`);
+        console.error(
+          `[YjsService] GC stats: ${clientCount} clients, ${deleteSetSize} pending deletes`
+        );
       }
-    } catch (error) {
+    } catch {
       // Ignore GC errors - they're not critical
     }
   }

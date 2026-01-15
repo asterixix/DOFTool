@@ -1,4 +1,13 @@
-import { Calendar, CheckSquare, Mail, Users, Settings, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Calendar,
+  CheckSquare,
+  Mail,
+  Users,
+  Settings,
+  Heart,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -29,14 +38,14 @@ export function SidebarContent({
   return (
     <>
       {/* Logo */}
-      <div className={cn(
-        'flex h-16 items-center border-b',
-        isCollapsed ? 'justify-center px-4' : 'gap-3 px-6'
-      )}>
-        <DOFToolLogo className="h-8 w-8 shrink-0" />
-        {!isCollapsed && (
-          <span className="text-lg font-semibold">{BRAND.name}</span>
+      <div
+        className={cn(
+          'flex h-16 items-center border-b',
+          isCollapsed ? 'justify-center px-4' : 'gap-3 px-6'
         )}
+      >
+        <DOFToolLogo className="h-8 w-8 shrink-0" />
+        {!isCollapsed && <span className="text-lg font-semibold">{BRAND.name}</span>}
       </div>
 
       {/* Navigation */}
@@ -53,9 +62,9 @@ export function SidebarContent({
                 isCollapsed && 'justify-center px-2'
               )
             }
+            title={isCollapsed ? item.label : undefined}
             to={item.to}
             onClick={onNavigate}
-            title={isCollapsed ? item.label : undefined}
           >
             <item.icon className="h-5 w-5 shrink-0" />
             {!isCollapsed && <span>{item.label}</span>}
@@ -64,7 +73,7 @@ export function SidebarContent({
       </nav>
 
       {/* Settings at bottom */}
-      <div className="border-t p-4 space-y-2">
+      <div className="space-y-2 border-t p-4">
         <NavLink
           className={({ isActive }) =>
             cn(
@@ -75,17 +84,17 @@ export function SidebarContent({
               isCollapsed && 'justify-center px-2'
             )
           }
+          title={isCollapsed ? 'Settings' : undefined}
           to="/settings"
           onClick={onNavigate}
-          title={isCollapsed ? 'Settings' : undefined}
         >
           <Settings className="h-5 w-5 shrink-0" />
           {!isCollapsed && <span>Settings</span>}
         </NavLink>
-        
+
         <button
           className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground w-full',
+            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
             isCollapsed && 'justify-center px-2'
           )}
           title={isCollapsed ? 'Support' : 'Support development on Buy Me a Coffee'}
@@ -101,35 +110,33 @@ export function SidebarContent({
   );
 }
 
-export function Sidebar({ 
-  className, 
-  onNavigate, 
-  isCollapsed = false, 
-  onToggleCollapse 
+export function Sidebar({
+  className,
+  onNavigate,
+  isCollapsed = false,
+  onToggleCollapse,
 }: SidebarProps): JSX.Element {
   return (
-    <aside className={cn(
-      'flex flex-col border-r bg-card transition-all duration-300 ease-in-out',
-      isCollapsed ? 'w-16' : 'w-64',
-      className
-    )}>
+    <aside
+      className={cn(
+        'flex flex-col border-r bg-card transition-all duration-300 ease-in-out',
+        isCollapsed ? 'w-16' : 'w-64',
+        className
+      )}
+    >
       <div className="flex flex-1 flex-col">
-        <SidebarContent onNavigate={onNavigate} isCollapsed={isCollapsed} />
+        <SidebarContent isCollapsed={isCollapsed} onNavigate={onNavigate} />
       </div>
       {/* Collapse Toggle */}
       <div className="border-t p-2">
         <Button
-          variant="ghost"
-          size="sm"
           className="w-full justify-center"
-          onClick={onToggleCollapse}
+          size="sm"
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          variant="ghost"
+          onClick={onToggleCollapse}
         >
-          {isCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
     </aside>

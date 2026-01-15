@@ -19,8 +19,4 @@ export {
 } from './stores/sync.store';
 
 // Types
-export type {
-  SyncStatus,
-  PeerInfo,
-  DiscoveredPeerInfo,
-} from './stores/sync.store';
+export type { SyncStatus, PeerInfo, DiscoveredPeerInfo } from './stores/sync.store';

@@ -49,9 +49,9 @@ export function AppLayout(): JSX.Element {
     <>
       <div className="flex h-screen overflow-hidden bg-background">
         {isDesktop ? (
-          <Sidebar 
+          <Sidebar
             isCollapsed={isSidebarCollapsed}
-            onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+            onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           />
         ) : (
           <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
@@ -61,11 +61,11 @@ export function AppLayout(): JSX.Element {
           </Sheet>
         )}
         <div className="flex flex-1 flex-col overflow-hidden">
-          <Header 
-            isMobile={!isDesktop} 
+          <Header
+            isMobile={!isDesktop}
             isSidebarCollapsed={isDesktop ? isSidebarCollapsed : false}
+            onToggleCollapse={isDesktop ? () => setIsSidebarCollapsed((prev) => !prev) : () => {}}
             onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-            onToggleCollapse={isDesktop ? () => setIsSidebarCollapsed(prev => !prev) : () => {}}
           />
           <main className="flex-1 overflow-auto">
             <Outlet />

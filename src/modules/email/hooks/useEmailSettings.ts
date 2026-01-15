@@ -37,7 +37,25 @@ function getEmailSettingsAPI(): EmailSettingsAPI {
   return window.electronAPI.emailSettings as EmailSettingsAPI;
 }
 
-export function useEmailSettings() {
+export function useEmailSettings(): {
+  settings: EmailSettings | null;
+  isLoading: boolean;
+  isSaving: boolean;
+  isTestingConnection: boolean;
+  testResult: {
+    success: boolean;
+    incoming?: { success: boolean; error?: string; latency?: number };
+    outgoing?: { success: boolean; error?: string; latency?: number };
+  } | null;
+  error: string | null;
+  loadSettings: () => Promise<void>;
+  saveSettings: (updates: Partial<EmailSettings>) => Promise<void>;
+  createAccount: (input: CreateEmailAccountSettingsInput) => Promise<string>;
+  updateAccount: (input: UpdateEmailAccountSettingsInput) => Promise<void>;
+  deleteAccount: (id: string) => Promise<void>;
+  testConnection: (input: TestConnectionInput) => Promise<void>;
+  clearError: () => void;
+} {
   const {
     settings,
     isLoading,

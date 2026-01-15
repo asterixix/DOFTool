@@ -38,10 +38,10 @@ interface PeerConnectionServiceEvents {
   'channel-open': (deviceId: string, channel: DataChannelLike) => void;
   'channel-closed': (deviceId: string) => void;
   'channel-message': (deviceId: string, data: string) => void;
-  'authenticated': (deviceId: string) => void;
+  authenticated: (deviceId: string) => void;
   'authentication-failed': (deviceId: string, reason: string) => void;
   'ice-candidate': (deviceId: string, candidate: RTCIceCandidateInit) => void;
-  'error': (deviceId: string, error: Error) => void;
+  error: (deviceId: string, error: Error) => void;
 }
 
 /** WebRTC factory interface for dependency injection */
@@ -50,24 +50,23 @@ export interface WebRTCFactory {
 }
 
 /** Default WebRTC factory using @roamhq/wrtc package */
-let wrtcModule: {
+type WebRTCModule = {
   RTCPeerConnection: new (config?: RTCConfiguration) => PeerConnectionLike;
-} | null = null;
+};
 
-async function loadWrtc(): Promise<typeof wrtcModule> {
+let wrtcModule: WebRTCModule | null = null;
+
+function loadWrtc(): WebRTCModule | null {
   if (!wrtcModule) {
     try {
       // Dynamic import of @roamhq/wrtc package
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const wrtc = require('@roamhq/wrtc') as { default?: typeof wrtcModule } &
-        typeof wrtcModule;
-      wrtcModule = (wrtc.default ?? wrtc) as typeof wrtcModule;
+      const wrtc = require('@roamhq/wrtc') as { default?: WebRTCModule } & WebRTCModule;
+      wrtcModule = wrtc.default ?? wrtc;
     } catch (error) {
       console.error('[PeerConnectionService] Failed to load @roamhq/wrtc:', error);
       // wrtc is optional - WebRTC can work without it in renderer process
-      console.error(
-        '[PeerConnectionService] WebRTC will be limited without @roamhq/wrtc package'
-      );
+      console.error('[PeerConnectionService] WebRTC will be limited without @roamhq/wrtc package');
       return null;
     }
   }
@@ -91,11 +90,11 @@ export class PeerConnectionService extends EventEmitter {
   /**
    * Initialize the peer connection service
    */
-  async initialize(config: PeerConnectionConfig): Promise<void> {
+  initialize(config: PeerConnectionConfig): void {
     this.config = config;
 
     // Load wrtc module and create default factory
-    const wrtc = await loadWrtc();
+    const wrtc = loadWrtc();
     if (wrtc) {
       this.webrtcFactory = {
         createPeerConnection: (rtcConfig?: RTCConfiguration) => {
@@ -214,10 +213,7 @@ export class PeerConnectionService extends EventEmitter {
   /**
    * Handle answer from remote peer
    */
-  async handleAnswer(
-    deviceId: string,
-    answer: RTCSessionDescriptionInit
-  ): Promise<void> {
+  async handleAnswer(deviceId: string, answer: RTCSessionDescriptionInit): Promise<void> {
     const connection = this.connections.get(deviceId);
     if (!connection?.peerConnection) {
       throw new Error(`No connection for device: ${deviceId}`);
@@ -229,10 +225,7 @@ export class PeerConnectionService extends EventEmitter {
   /**
    * Add ICE candidate from remote peer
    */
-  async addIceCandidate(
-    deviceId: string,
-    candidate: RTCIceCandidateInit
-  ): Promise<void> {
+  async addIceCandidate(deviceId: string, candidate: RTCIceCandidateInit): Promise<void> {
     const connection = this.connections.get(deviceId);
     if (!connection?.peerConnection) {
       throw new Error(`No connection for device: ${deviceId}`);
@@ -244,10 +237,7 @@ export class PeerConnectionService extends EventEmitter {
   /**
    * Setup handlers for peer connection events
    */
-  private setupPeerConnectionHandlers(
-    deviceId: string,
-    pc: PeerConnectionLike
-  ): void {
+  private setupPeerConnectionHandlers(deviceId: string, pc: PeerConnectionLike): void {
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         this.emit('ice-candidate', deviceId, event.candidate);
@@ -256,7 +246,9 @@ export class PeerConnectionService extends EventEmitter {
 
     pc.onconnectionstatechange = () => {
       const connection = this.connections.get(deviceId);
-      if (!connection) {return;}
+      if (!connection) {
+        return;
+      }
 
       switch (pc.connectionState) {
         case 'connected':
@@ -277,14 +269,11 @@ export class PeerConnectionService extends EventEmitter {
   /**
    * Setup handlers for data channel events
    */
-  private setupDataChannelHandlers(
-    deviceId: string,
-    channel: DataChannelLike
-  ): void {
+  private setupDataChannelHandlers(deviceId: string, channel: DataChannelLike): void {
     channel.onopen = () => {
       this.updateConnectionStatus(deviceId, 'authenticating');
       this.emit('channel-open', deviceId, channel);
-      
+
       // Start authentication
       this.startAuthentication(deviceId);
     };
@@ -325,7 +314,7 @@ export class PeerConnectionService extends EventEmitter {
 
       // Forward other messages
       this.emit('channel-message', deviceId, data);
-    } catch (error) {
+    } catch {
       // Non-JSON message, forward as-is
       this.emit('channel-message', deviceId, data);
     }
@@ -335,10 +324,14 @@ export class PeerConnectionService extends EventEmitter {
    * Start authentication process
    */
   private startAuthentication(deviceId: string): void {
-    if (!this.config) {return;}
+    if (!this.config) {
+      return;
+    }
 
     const connection = this.connections.get(deviceId);
-    if (!connection?.dataChannel) {return;}
+    if (!connection?.dataChannel) {
+      return;
+    }
 
     const authRequest: AuthRequest = {
       type: 'AUTH_REQUEST',
@@ -366,7 +359,9 @@ export class PeerConnectionService extends EventEmitter {
    * Handle authentication request from remote peer
    */
   private handleAuthRequest(deviceId: string, _request: AuthRequest): void {
-    if (!this.config) {return;}
+    if (!this.config) {
+      return;
+    }
 
     // TODO: Verify signature with device's public key from _request
 
@@ -474,7 +469,9 @@ export class PeerConnectionService extends EventEmitter {
    */
   closeConnection(deviceId: string): void {
     const connection = this.connections.get(deviceId);
-    if (!connection) {return;}
+    if (!connection) {
+      return;
+    }
 
     // Clear auth timeout
     const timeout = this.pendingAuth.get(deviceId);

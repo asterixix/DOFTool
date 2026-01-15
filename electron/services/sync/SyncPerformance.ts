@@ -1,6 +1,6 @@
 /**
  * Sync Performance Utilities
- * 
+ *
  * Provides debouncing, throttling, and batching utilities for sync operations
  * to prevent blocking the main thread and improve overall app responsiveness.
  */
@@ -146,11 +146,9 @@ export class BatchProcessor<T> {
       return;
     }
 
-    if (!this.timeoutId) {
-      this.timeoutId = setTimeout(() => {
-        this.flush();
-      }, this.maxWaitMs);
-    }
+    this.timeoutId ??= setTimeout(() => {
+      this.flush();
+    }, this.maxWaitMs);
   }
 
   flush(): void {
@@ -196,7 +194,8 @@ export class AsyncQueue {
           const result = await fn();
           resolve(result);
         } catch (error) {
-          reject(error);
+          const reason = error instanceof Error ? error : new Error(String(error));
+          reject(reason);
         }
       };
 
@@ -211,7 +210,9 @@ export class AsyncQueue {
     }
 
     const task = this.queue.shift();
-    if (!task) {return;}
+    if (!task) {
+      return;
+    }
 
     this.running++;
     try {
@@ -238,7 +239,8 @@ export function deferToNextTick<T>(fn: () => T): Promise<T> {
       try {
         resolve(fn());
       } catch (error) {
-        reject(error);
+        const reason = error instanceof Error ? error : new Error(String(error));
+        reject(reason);
       }
     });
   });

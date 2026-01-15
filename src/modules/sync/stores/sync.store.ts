@@ -96,9 +96,7 @@ export const useSyncStore = create<SyncStore>()(
 
     updatePeer: (deviceId: string, updates: Partial<PeerInfo>) =>
       set((state) => ({
-        peers: state.peers.map((p) =>
-          p.deviceId === deviceId ? { ...p, ...updates } : p
-        ),
+        peers: state.peers.map((p) => (p.deviceId === deviceId ? { ...p, ...updates } : p)),
       })),
 
     // Computed helpers
@@ -140,7 +138,8 @@ export const useSyncStore = create<SyncStore>()(
 // Selector hooks for optimized re-renders
 export const selectSyncStatus = (state: SyncStore): SyncStatus => state.status;
 export const selectPeers = (state: SyncStore): PeerInfo[] => state.peers;
-export const selectDiscoveredPeers = (state: SyncStore): DiscoveredPeerInfo[] => state.discoveredPeers;
+export const selectDiscoveredPeers = (state: SyncStore): DiscoveredPeerInfo[] =>
+  state.discoveredPeers;
 export const selectPeerCount = (state: SyncStore): number => state.peerCount;
 export const selectLastSyncAt = (state: SyncStore): number | null => state.lastSyncAt;
 export const selectIsConnected = (state: SyncStore): boolean => state.isConnected();

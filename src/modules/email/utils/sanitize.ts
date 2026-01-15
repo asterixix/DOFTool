@@ -147,8 +147,8 @@ export const SANITIZE_CONFIG = {
     ALLOWED_STYLES: {
       '*': {
         // Allow most CSS properties for better email rendering
-        'color': true,
-        'background': true,
+        color: true,
+        background: true,
         'background-color': true,
         'background-image': true,
         'font-size': true,
@@ -159,30 +159,30 @@ export const SANITIZE_CONFIG = {
         'font-family': true,
         'line-height': true,
         'letter-spacing': true,
-        'margin': true,
+        margin: true,
         'margin-top': true,
         'margin-bottom': true,
         'margin-left': true,
         'margin-right': true,
-        'padding': true,
+        padding: true,
         'padding-top': true,
         'padding-bottom': true,
         'padding-left': true,
         'padding-right': true,
-        'border': true,
+        border: true,
         'border-color': true,
         'border-width': true,
         'border-style': true,
         'border-radius': true,
-        'width': true,
-        'height': true,
+        width: true,
+        height: true,
         'max-width': true,
         'min-width': true,
         'max-height': true,
         'min-height': true,
-        'display': true,
-        'float': true,
-        'clear': true,
+        display: true,
+        float: true,
+        clear: true,
         'vertical-align': true,
         'white-space': true,
         'word-wrap': true,
@@ -194,9 +194,9 @@ export const SANITIZE_CONFIG = {
         'text-transform': true,
         'text-shadow': true,
         'box-shadow': true,
-        'opacity': true,
-        'transform': true,
-        'transition': true,
+        opacity: true,
+        transform: true,
+        transition: true,
       },
     },
     ALLOWED_URI_REGEXP: /^(?:(?:https?|ftp|mailto|tel):\/|data:image\/|data:font\/|cid:)/i,
@@ -369,7 +369,7 @@ function decodeQuotedPrintable(text: string): string {
   }
 
   // Replace =XX hex codes with actual characters
-  let decoded = text.replace(/=([0-9A-Fa-f]{2})/g, (_match, hex) => {
+  let decoded = text.replace(/=([0-9A-Fa-f]{2})/g, (_match: string, hex: string) => {
     return String.fromCharCode(parseInt(hex, 16));
   });
 
@@ -422,10 +422,7 @@ export function normalizeHtmlEntities(html: string): string {
     // Add meta tag right after <head> if it exists, or at the beginning
     const headMatch = decoded.match(/<head[^>]*>/i);
     if (headMatch) {
-      return decoded.replace(
-        headMatch[0],
-        `${headMatch[0]}<meta charset="utf-8">`
-      );
+      return decoded.replace(headMatch[0], `${headMatch[0]}<meta charset="utf-8">`);
     } else {
       // Insert at the beginning of the document
       return `<meta charset="utf-8">${decoded}`;
@@ -486,6 +483,12 @@ export function sanitizeHtml(
 
   // Merge with custom options - spread base config to make it mutable
   // Use type assertion to avoid exactOptionalPropertyTypes conflicts with DOMPurify
+  type ConfigWithAllowedUri = { readonly ALLOWED_URI_REGEXP: RegExp };
+  const allowedUriRegexp =
+    'ALLOWED_URI_REGEXP' in baseConfig
+      ? (baseConfig as ConfigWithAllowedUri).ALLOWED_URI_REGEXP
+      : undefined;
+
   const config = {
     ALLOWED_TAGS: [...baseConfig.ALLOWED_TAGS],
     ALLOWED_ATTR: [...baseConfig.ALLOWED_ATTR],
@@ -493,6 +496,7 @@ export function sanitizeHtml(
     FORBID_TAGS: [...baseConfig.FORBID_TAGS],
     FORBID_ATTR: [...baseConfig.FORBID_ATTR],
     KEEP_CONTENT: baseConfig.KEEP_CONTENT,
+    ...(allowedUriRegexp ? { ALLOWED_URI_REGEXP: allowedUriRegexp } : {}),
     ...options,
   };
 

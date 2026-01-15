@@ -11,10 +11,10 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useResizablePanel } from '@/hooks/useResizablePanel';
 import { cn } from '@/lib/utils';
 import { EmptyState, LoadingSpinner } from '@/shared/components';
 import { getEmailAPI } from '@/shared/utils/electronAPI';
-import { useResizablePanel } from '@/hooks/useResizablePanel';
 
 import { EmailSidebar } from './EmailSidebar';
 import { FolderManager } from './FolderManager';
@@ -75,7 +75,7 @@ export function EmailClient(): JSX.Element {
     maxWidth: 500,
     storageKey: 'email-sidebar-width',
   });
-  
+
   const messageListPanel = useResizablePanel({
     defaultWidth: 400,
     minWidth: 250,
@@ -471,15 +471,15 @@ export function EmailClient(): JSX.Element {
             <div className="flex flex-1 flex-col">
               <MessageView
                 message={selectedMessage}
+                onArchive={handleArchive}
                 onBack={() => setSelectedMessageId(null)}
+                onDelete={handleDelete}
+                onDownloadAttachment={handleDownloadAttachment}
+                onForward={handleForward}
+                onMarkAsRead={handleMarkAsRead}
                 onReply={handleReply}
                 onReplyAll={handleReplyAll}
-                onForward={handleForward}
-                onArchive={handleArchive}
-                onDelete={handleDelete}
                 onToggleStar={handleToggleStar}
-                onMarkAsRead={handleMarkAsRead}
-                onDownloadAttachment={handleDownloadAttachment}
               />
             </div>
           )}
@@ -490,7 +490,7 @@ export function EmailClient(): JSX.Element {
       {isDesktop && (
         <>
           {/* Desktop Sidebar - Resizable */}
-          <div 
+          <div
             ref={sidebarPanel.panelRef}
             className="relative shrink-0 bg-muted/30"
             style={{ width: `${sidebarPanel.width}px` }}
@@ -498,19 +498,21 @@ export function EmailClient(): JSX.Element {
             {sidebarContent}
           </div>
           {/* Resize handle - between sidebar and message list */}
-          <div
+          <button
+            aria-label="Resize sidebar"
             className={cn(
-              'w-1 shrink-0 cursor-col-resize bg-border hover:bg-primary/50 transition-colors',
+              'w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/50',
               sidebarPanel.isResizing && 'bg-primary'
             )}
-            onMouseDown={sidebarPanel.handleMouseDown}
             title="Drag to resize"
+            type="button"
+            onMouseDown={sidebarPanel.handleMouseDown}
           />
 
           {/* Message List - Resizable on desktop, always visible */}
           <div
             ref={messageListPanel.panelRef}
-            className="relative flex flex-col bg-background shrink-0"
+            className="relative flex shrink-0 flex-col bg-background"
             style={{ width: `${messageListPanel.width}px` }}
           >
             {/* List Header */}
@@ -536,13 +538,15 @@ export function EmailClient(): JSX.Element {
             />
           </div>
           {/* Second resize handle - between message list and message view */}
-          <div
+          <button
+            aria-label="Resize message list"
             className={cn(
-              'w-1 shrink-0 cursor-col-resize bg-border hover:bg-primary/50 transition-colors',
+              'w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/50',
               messageListPanel.isResizing && 'bg-primary'
             )}
-            onMouseDown={messageListPanel.handleMouseDown}
             title="Drag to resize message list"
+            type="button"
+            onMouseDown={messageListPanel.handleMouseDown}
           />
 
           {/* Message View - Takes remaining space */}
@@ -562,15 +566,15 @@ export function EmailClient(): JSX.Element {
           </div>
         </>
       )}
-      
+
       {/* Message Composer Dialog */}
       {composerOpen && selectedAccountId && (
         <MessageComposer
+          accountEmail={selectedAccount?.email ?? ''}
+          accountId={selectedAccountId}
           isOpen={composerOpen}
           mode={composerMode}
           replyTo={replyToMessage}
-          accountId={selectedAccountId}
-          accountEmail={selectedAccount?.email ?? ''}
           onClose={() => setComposerOpen(false)}
           onSaveDraft={() => {}}
           onSend={handleSend}

@@ -2,9 +2,8 @@
  * Tutorial Types
  */
 
-import type { LucideIcon } from 'lucide-react';
-
 import type { TutorialStep } from '@/stores/settings.store';
+import type { LucideIcon } from 'lucide-react';
 
 export interface TutorialStepContent {
   id: TutorialStep;

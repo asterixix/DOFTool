@@ -468,7 +468,7 @@ export function TaskEditor({
                 <Button disabled={isSaving} type="button" variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button disabled={isSaving || !title.trim() || !taskListId} type="submit">
+                <Button disabled={!!isSaving || !title.trim() || !taskListId} type="submit">
                   {isSaving ? 'Saving...' : isEditing ? 'Update' : 'Create'}
                 </Button>
               </div>
