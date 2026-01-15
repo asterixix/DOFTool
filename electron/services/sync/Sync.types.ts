@@ -6,7 +6,7 @@
 
 import type { EventEmitter } from 'events';
 
-// WebRTC types for Electron main process (using wrtc package types)
+// WebRTC types for Electron main process (using @roamhq/wrtc package types)
 // These mirror the browser WebRTC API
 export interface RTCConfiguration {
   iceServers?: RTCIceServer[];

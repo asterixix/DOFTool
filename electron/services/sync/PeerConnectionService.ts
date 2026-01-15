@@ -2,7 +2,7 @@
  * Peer Connection Service - WebRTC peer connection management
  *
  * Manages WebRTC peer connections for P2P data synchronization.
- * Uses wrtc package for Node.js WebRTC support in Electron main process.
+ * Uses @roamhq/wrtc package for Node.js WebRTC support in Electron main process.
  */
 
 import { EventEmitter } from 'events';
@@ -49,7 +49,7 @@ export interface WebRTCFactory {
   createPeerConnection(config?: RTCConfiguration): PeerConnectionLike;
 }
 
-/** Default WebRTC factory using wrtc package */
+/** Default WebRTC factory using @roamhq/wrtc package */
 let wrtcModule: {
   RTCPeerConnection: new (config?: RTCConfiguration) => PeerConnectionLike;
 } | null = null;
@@ -57,14 +57,17 @@ let wrtcModule: {
 async function loadWrtc(): Promise<typeof wrtcModule> {
   if (!wrtcModule) {
     try {
-      // Dynamic import of wrtc package
+      // Dynamic import of @roamhq/wrtc package
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const wrtc = require('wrtc') as typeof wrtcModule;
-      wrtcModule = wrtc;
+      const wrtc = require('@roamhq/wrtc') as { default?: typeof wrtcModule } &
+        typeof wrtcModule;
+      wrtcModule = (wrtc.default ?? wrtc) as typeof wrtcModule;
     } catch (error) {
-      console.error('[PeerConnectionService] Failed to load wrtc:', error);
+      console.error('[PeerConnectionService] Failed to load @roamhq/wrtc:', error);
       // wrtc is optional - WebRTC can work without it in renderer process
-      console.error('[PeerConnectionService] WebRTC will be limited without wrtc package');
+      console.error(
+        '[PeerConnectionService] WebRTC will be limited without @roamhq/wrtc package'
+      );
       return null;
     }
   }

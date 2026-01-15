@@ -69,6 +69,7 @@ export default defineConfig({
 							'bonjour-service',
 							'imapflow',
 							'nodemailer',
+							'@roamhq/wrtc',
 							'libsodium-wrappers',
 							// Mark as external to prevent analysis
 							/^libsodium/,
