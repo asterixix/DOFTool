@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+# react
+
+Functional components only
+Custom hooks for business logic
+Zustand for state management (integrates well with Yjs)
+React Query for async state (email fetching)

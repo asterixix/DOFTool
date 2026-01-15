@@ -1,0 +1,454 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Email rendering styles */
+.email-renderer {
+  @apply text-foreground;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.email-renderer :global(*) {
+  max-width: 100%;
+}
+
+.email-renderer :global(img) {
+  @apply h-auto max-w-full rounded;
+  height: auto !important;
+}
+
+.email-renderer :global(table) {
+  @apply w-full border-collapse;
+  max-width: 100%;
+}
+
+.email-renderer :global(th),
+.email-renderer :global(td) {
+  @apply border border-border p-2;
+  word-wrap: break-word;
+}
+
+.email-renderer :global(blockquote) {
+  @apply my-4 border-l-4 border-muted-foreground pl-4 italic;
+  margin: 1rem 0;
+}
+
+.email-renderer :global(pre) {
+  @apply overflow-x-auto rounded bg-muted p-4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-width: 100%;
+}
+
+.email-renderer :global(code) {
+  @apply rounded bg-muted px-1 text-sm;
+}
+
+.email-renderer :global(p) {
+  margin: 0.5em 0;
+}
+
+.email-renderer :global(div) {
+  margin: 0.5em 0;
+}
+
+.email-renderer :global(span) {
+  display: inline;
+}
+
+.email-renderer :global(a) {
+  @apply text-primary underline;
+  word-break: break-all;
+}
+
+.email-renderer :global(h1),
+.email-renderer :global(h2),
+.email-renderer :global(h3),
+.email-renderer :global(h4),
+.email-renderer :global(h5),
+.email-renderer :global(h6) {
+  margin: 0.5em 0;
+  font-weight: bold;
+}
+
+.email-renderer :global(ul),
+.email-renderer :global(ol) {
+  margin: 0.5em 0;
+  padding-left: 2em;
+}
+
+.email-renderer :global(li) {
+  margin: 0.25em 0;
+}
+
+.email-renderer :global(hr) {
+  @apply border-border;
+  margin: 1em 0;
+}
+
+.email-renderer :global(font) {
+  display: inline;
+}
+
+.email-renderer :global(center) {
+  text-align: center;
+  display: block;
+}
+
+/* Dark mode email styles */
+.email-dark-mode :global(body) {
+  @apply bg-background text-foreground;
+}
+
+.email-dark-mode :global(p),
+.email-dark-mode :global(div),
+.email-dark-mode :global(span),
+.email-dark-mode :global(li),
+.email-dark-mode :global(td),
+.email-dark-mode :global(th) {
+  @apply text-foreground;
+}
+
+.email-dark-mode :global(a) {
+  @apply text-primary;
+}
+
+.email-dark-mode :global(blockquote) {
+  @apply border-muted-foreground/50 bg-muted/30;
+}
+
+/* Print styles for emails */
+@media print {
+  .email-renderer {
+    @apply text-black;
+  }
+
+  .email-renderer :global(img) {
+    @apply max-w-full;
+  }
+
+  .email-renderer :global(table) {
+    @apply border border-black;
+  }
+
+  .email-renderer :global(th),
+  .email-renderer :global(td) {
+    @apply border border-black;
+  }
+
+  .email-renderer :global(a) {
+    @apply text-black underline;
+  }
+
+  .email-renderer :global(a[href]:after) {
+    content: ' (' attr(href) ')';
+    font-size: 0.8em;
+  }
+
+  .email-renderer :global(blockquote) {
+    @apply border-l-4 border-black pl-4;
+  }
+
+  .email-renderer :global(pre) {
+    @apply border border-black bg-white;
+  }
+}
+
+@layer base {
+  :root {
+    /* Warm, family-friendly light theme */
+    /* CSS variables should contain RAW HSL values (without hsl() wrapper) */
+    /* because Tailwind config wraps them in hsl() */
+    --background: 30 100% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 30 100% 99%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 30 100% 99%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 173 83% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 28 40% 94%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 28 40% 94%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 28 60% 92%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 28 25% 86%;
+    --input: 28 25% 86%;
+    --ring: 173 83% 32%;
+
+    --brand-accent: 24 95% 53%;
+    --brand-accent-foreground: 0 0% 100%;
+
+    --radius: 0.5rem;
+
+    /* Sync status colors */
+    --sync-connected: 142 76% 36%;
+    --sync-syncing: 45 93% 47%;
+    --sync-offline: 0 84% 60%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    /* Warm dark theme */
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 172 66% 45%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 222 47% 12%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 222 47% 12%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 222 47% 12%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 222 30% 18%;
+    --input: 222 30% 18%;
+    --ring: 172 66% 45%;
+
+    --brand-accent: 24 95% 56%;
+    --brand-accent-foreground: 222 47% 11%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
+  }
+
+  /* Prevent text selection during drag operations */
+  .dragging {
+    user-select: none;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-muted-foreground/20;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
+  }
+
+  /* Focus styles */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* Sync status indicator */
+  .sync-indicator {
+    @apply flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium;
+  }
+
+  .sync-indicator--connected {
+    @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400;
+  }
+
+  .sync-indicator--syncing {
+    @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400;
+  }
+
+  .sync-indicator--offline {
+    @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400;
+  }
+
+  /* Calendar event colors */
+  .event-color-red {
+    @apply border-calendar-red bg-calendar-red/20 text-calendar-red;
+  }
+  .event-color-orange {
+    @apply border-calendar-orange bg-calendar-orange/20 text-calendar-orange;
+  }
+  .event-color-amber {
+    @apply border-calendar-amber bg-calendar-amber/20 text-calendar-amber;
+  }
+  .event-color-yellow {
+    @apply border-calendar-yellow bg-calendar-yellow/20 text-calendar-yellow;
+  }
+  .event-color-lime {
+    @apply border-calendar-lime bg-calendar-lime/20 text-calendar-lime;
+  }
+  .event-color-green {
+    @apply border-calendar-green bg-calendar-green/20 text-calendar-green;
+  }
+  .event-color-emerald {
+    @apply border-calendar-emerald bg-calendar-emerald/20 text-calendar-emerald;
+  }
+  .event-color-teal {
+    @apply border-calendar-teal bg-calendar-teal/20 text-calendar-teal;
+  }
+  .event-color-cyan {
+    @apply border-calendar-cyan bg-calendar-cyan/20 text-calendar-cyan;
+  }
+  .event-color-sky {
+    @apply border-calendar-sky bg-calendar-sky/20 text-calendar-sky;
+  }
+  .event-color-blue {
+    @apply border-calendar-blue bg-calendar-blue/20 text-calendar-blue;
+  }
+  .event-color-indigo {
+    @apply border-calendar-indigo bg-calendar-indigo/20 text-calendar-indigo;
+  }
+  .event-color-violet {
+    @apply border-calendar-violet bg-calendar-violet/20 text-calendar-violet;
+  }
+  .event-color-purple {
+    @apply border-calendar-purple bg-calendar-purple/20 text-calendar-purple;
+  }
+  .event-color-fuchsia {
+    @apply border-calendar-fuchsia bg-calendar-fuchsia/20 text-calendar-fuchsia;
+  }
+  .event-color-pink {
+    @apply border-calendar-pink bg-calendar-pink/20 text-calendar-pink;
+  }
+  .event-color-rose {
+    @apply border-calendar-rose bg-calendar-rose/20 text-calendar-rose;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-in {
+    animation-duration: 150ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: forwards;
+  }
+
+  .animate-out {
+    animation-duration: 150ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: forwards;
+  }
+
+  /* Safe area for Electron window controls */
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag-region {
+    -webkit-app-region: no-drag;
+  }
+
+  /* Reduce motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Safe area insets for notched devices */
+  @supports (padding: env(safe-area-inset-top)) {
+    .safe-top {
+      padding-top: env(safe-area-inset-top);
+    }
+
+    .safe-right {
+      padding-right: env(safe-area-inset-right);
+    }
+
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .safe-left {
+      padding-left: env(safe-area-inset-left);
+    }
+
+    .safe-x {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    .safe-y {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .safe-all {
+      padding-top: env(safe-area-inset-top);
+      padding-right: env(safe-area-inset-right);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+    }
+  }
+
+  /* Touch-friendly tap targets */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text selection on interactive elements */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  /* Enable smooth scrolling on touch devices */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Prevent pull-to-refresh on mobile */
+  .no-pull-refresh {
+    overscroll-behavior-y: contain;
+  }
+}

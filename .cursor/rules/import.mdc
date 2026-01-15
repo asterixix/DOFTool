@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+# import
+
+React/external libraries
+Internal modules (absolute paths)
+Relative imports
+Styles

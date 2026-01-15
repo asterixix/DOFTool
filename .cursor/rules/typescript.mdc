@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+# typescript
+
+Strict mode enabled, no any types
+Interface over type for objects
+Explicit return types for public functions
+Barrel exports per module

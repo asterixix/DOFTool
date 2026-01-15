@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+# naming
+
+Components: PascalCase.tsx
+Hooks: useCamelCase.ts
+Utils: camelCase.ts
+Types: PascalCase.types.ts
+Stores: camelCase.store.ts
