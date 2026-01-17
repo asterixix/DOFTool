@@ -1,6 +1,6 @@
 {
   "name": "doftool",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Decentralized, offline-first, end-to-end encrypted family collaboration for Calendar, Tasks, and Email",
   "main": "dist/electron/main.js",
   "author": {
@@ -41,9 +41,14 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build:win": "npm run build && electron-builder --win zip",
+    "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
+    "build:all": "npm run build && electron-builder --win --mac --linux",
+    "release": "npm run build && electron-builder --win --mac --linux --publish always",
+    "release:win": "npm run build && electron-builder --win --publish always",
+    "release:mac": "npm run build && electron-builder --mac --publish always",
+    "release:linux": "npm run build && electron-builder --linux --publish always",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -55,12 +60,17 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"electron/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"electron/**/*.ts\"",
     "icons": "node scripts/generate-icons.js",
+    "version:patch": "node scripts/bump-version.js patch --tag",
+    "version:minor": "node scripts/bump-version.js minor --tag",
+    "version:major": "node scripts/bump-version.js major --tag",
+    "version:prerelease": "node scripts/bump-version.js prerelease --tag",
     "typecheck": "tsc --noEmit",
     "typecheck:electron": "tsc --noEmit -p tsconfig.electron.json",
     "prepare": "husky",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
+    "@aptabase/electron": "^0.3.1",
     "@hookform/resolvers": "^3.9.0",
     "@noble/ed25519": "^2.1.0",
     "@radix-ui/react-accordion": "^1.2.0",
@@ -82,11 +92,11 @@
     "@radix-ui/react-toast": "^1.2.1",
     "@radix-ui/react-tooltip": "^1.1.2",
     "@radix-ui/react-visually-hidden": "^1.2.4",
-    "@roamhq/wrtc": "^0.8.0",
     "@tanstack/react-query": "^5.51.23",
     "@tanstack/react-virtual": "^3.8.4",
     "@types/dompurify": "^3.0.5",
     "bonjour-service": "^1.2.1",
+    "bufferutil": "^4.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
@@ -106,13 +116,15 @@
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.52.2",
+    "react-letter": "^0.4.0",
     "react-router-dom": "^6.26.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^10.0.0",
+    "ws": "^8.19.0",
     "y-leveldb": "^0.1.2",
     "y-protocols": "^1.0.6",
-    "y-webrtc": "^10.3.0",
+    "y-webrtc": "^10.1.0",
     "yjs": "^13.6.18",
     "zod": "^3.23.8",
     "zustand": "^4.5.4"
@@ -128,6 +140,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.0.1",
     "@typescript-eslint/parser": "^8.0.1",
     "@vitejs/plugin-react-swc": "^3.7.0",
@@ -149,7 +162,6 @@
     "icon-gen": "^5.0.0",
     "jsdom": "^24.1.1",
     "lint-staged": "^15.2.8",
-    "node-pre-gyp": "^0.17.0",
     "postcss": "^8.4.41",
     "prettier": "^3.3.3",
     "prettier-plugin-tailwindcss": "^0.6.5",
@@ -188,6 +200,7 @@
     ],
     "win": {
       "target": [
+        "nsis",
         "zip"
       ],
       "icon": "build/icon.ico",
@@ -200,7 +213,8 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "icon": "build/icon.icns",
       "category": "public.app-category.productivity",
