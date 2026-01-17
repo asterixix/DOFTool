@@ -68,6 +68,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: List build output
+        run: ls -la dist-release/
+        shell: bash
+
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -75,7 +79,10 @@ jobs:
           path: |
             dist-release/*.exe
             dist-release/*.zip
-          if-no-files-found: warn
+            dist-release/*.blockmap
+            dist-release/latest.yml
+          if-no-files-found: error
+          retention-days: 1
 
   # Build for macOS
   build-macos:
@@ -102,6 +109,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: List build output
+        run: ls -la dist-release/
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -109,7 +119,10 @@ jobs:
           path: |
             dist-release/*.dmg
             dist-release/*.zip
-          if-no-files-found: warn
+            dist-release/*.blockmap
+            dist-release/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 1
 
   # Build for Linux
   build-linux:
@@ -136,6 +149,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: List build output
+        run: ls -la dist-release/
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -144,7 +160,9 @@ jobs:
             dist-release/*.AppImage
             dist-release/*.deb
             dist-release/*.rpm
-          if-no-files-found: warn
+            dist-release/latest-linux.yml
+          if-no-files-found: error
+          retention-days: 1
 
   # Create GitHub Release and upload all artifacts
   release:
@@ -154,13 +172,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: windows-build
+          path: artifacts/windows
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build
+          path: artifacts/macos
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-build
+          path: artifacts/linux
 
       - name: Display structure of downloaded files
-        run: ls -R artifacts
+        run: |
+          echo "=== All artifacts ==="
+          ls -laR artifacts/
+          echo "=== Files to upload ==="
+          find artifacts -type f -name "*.exe" -o -name "*.zip" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.yml" -o -name "*.blockmap"
 
       - name: Get version from tag
         id: get_version
@@ -178,9 +213,19 @@ jobs:
           draft: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            artifacts/windows-build/*
-            artifacts/macos-build/*
-            artifacts/linux-build/*
+            artifacts/windows/*.exe
+            artifacts/windows/*.zip
+            artifacts/windows/*.blockmap
+            artifacts/windows/*.yml
+            artifacts/macos/*.dmg
+            artifacts/macos/*.zip
+            artifacts/macos/*.blockmap
+            artifacts/macos/*.yml
+            artifacts/linux/*.AppImage
+            artifacts/linux/*.deb
+            artifacts/linux/*.rpm
+            artifacts/linux/*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
