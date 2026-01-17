@@ -197,21 +197,27 @@ jobs:
           echo "=== Files to upload ==="
           find artifacts -type f -name "*.exe" -o -name "*.zip" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.yml" -o -name "*.blockmap"
 
-      - name: Get version from tag
+      - name: Get version and tag name
         id: get_version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
             echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          else
+            echo "TAG_NAME=v${{ inputs.version }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "ERROR: This workflow must be triggered by a tag or workflow_dispatch with version"
+            exit 1
           fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.get_version.outputs.TAG_NAME }}
           name: DOFTool v${{ steps.get_version.outputs.VERSION }}
           draft: true
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          prerelease: ${{ contains(steps.get_version.outputs.TAG_NAME, 'alpha') || contains(steps.get_version.outputs.TAG_NAME, 'beta') || contains(steps.get_version.outputs.TAG_NAME, 'rc') }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
