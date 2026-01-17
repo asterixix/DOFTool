@@ -9,7 +9,6 @@ dist/
 release/
 out/
 build/
-tests/
 test-results/
 scripts/
 playwright-report/

@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/API.md` IPC API reference
 - `docs/TESTING.md` testing guidelines
 - `docs/TROUBLESHOOTING.md` common issues guide
+- AppVeyor CI/CD configuration for cross-platform builds (`appveyor.yml`)
+  - Visual Studio 2022 (Windows)
+  - Ubuntu 22.04 (Linux)
+  - macOS Ventura (macOS)
 
 ### Changed
 

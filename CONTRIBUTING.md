@@ -12,6 +12,7 @@ Thank you for your interest in contributing to DOFTool! This document provides g
 - [Pull Request Process](#pull-request-process)
 - [Testing](#testing)
 - [Security](#security)
+- [CI/CD](#cicd)
 
 ---
 
@@ -327,6 +328,50 @@ Please report security issues privately via:
 
 - [GitHub Security Advisories](https://github.com/asterixix/DOFTool/security/advisories/new)
 - Email: artur@sendyka.dev
+
+---
+
+## CI/CD
+
+DOFTool uses multiple CI/CD systems for cross-platform builds and releases:
+
+### GitHub Actions
+
+- **CI** (`ci.yml`): Runs on all PRs and pushes to `main`/`develop`
+  - Linting, type checking, unit tests
+  - Build verification on all platforms
+- **Release** (`release.yml`): Triggered by version tags (`v*`)
+  - Builds for Windows, macOS, and Linux
+  - Creates GitHub draft releases
+
+### AppVeyor (Cross-Platform)
+
+AppVeyor is used for cross-platform Electron builds with native dependencies. The configuration is in `appveyor.yml`.
+
+**Build worker images:**
+- **Visual Studio 2022** - Windows builds
+- **Ubuntu2204** - Linux builds (Ubuntu 22.04)
+- **macos-ventura** - macOS builds (macOS 13 Ventura)
+
+**Setup (for maintainers):**
+
+1. Link the repository at [appveyor.com](https://ci.appveyor.com)
+2. Configure environment variables in AppVeyor project settings:
+   - `GH_TOKEN`: GitHub personal access token with `repo` scope (encrypt it)
+3. Enable builds for tags and branches as needed
+
+**Build triggers:**
+- Pushes to `main` and `develop` branches
+- Version tags (`v*`)
+- Skips documentation-only changes
+
+**Artifacts produced per platform:**
+
+| Platform | Artifacts |
+| -------- | --------- |
+| Windows  | `.exe` installer, `.zip` portable, `latest.yml` |
+| Linux    | `.AppImage`, `.deb`, `.rpm`, `latest-linux.yml` |
+| macOS    | `.dmg` disk image, `.zip` archive, `latest-mac.yml` |
 
 ---
 
