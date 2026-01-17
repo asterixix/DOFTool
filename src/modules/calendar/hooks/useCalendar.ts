@@ -673,11 +673,13 @@ export function useCalendar(): UseCalendarReturn {
         }
 
         if (input.reminders !== undefined) {
+          /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
           createData.reminders = input.reminders.map((r) => ({
             id: r.id,
-            type: r.type,
+            type: 'display',
             minutes: r.minutes,
           }));
+          /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
         }
 
         if (input.attendees !== undefined) {
@@ -774,11 +776,13 @@ export function useCalendar(): UseCalendarReturn {
         }
 
         if (data.reminders !== undefined) {
+          /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
           updateData.reminders = data.reminders.map((r) => ({
             id: r.id,
-            type: r.type,
+            type: 'display',
             minutes: r.minutes,
           }));
+          /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
         }
 
         if (data.attendees !== undefined) {

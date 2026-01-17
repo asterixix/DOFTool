@@ -90,6 +90,8 @@ export function SyncStatusPopover(): JSX.Element {
     connectedPeerCount,
     isConnected,
     isOffline,
+    isInitialized,
+    error,
     forceSync,
     startSync,
     stopSync,
@@ -101,6 +103,10 @@ export function SyncStatusPopover(): JSX.Element {
 
   const handleToggleSync = (): void => {
     if (isOffline) {
+      if (!isInitialized) {
+        // Show message that service is initializing
+        return;
+      }
       startSync();
     } else {
       stopSync();
@@ -155,6 +161,12 @@ export function SyncStatusPopover(): JSX.Element {
             </div>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{lastSyncText}</p>
+          {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+          {!isInitialized && (
+            <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+              Initializing sync service...
+            </p>
+          )}
         </div>
 
         <ScrollArea className="max-h-[300px]">
@@ -214,11 +226,21 @@ export function SyncStatusPopover(): JSX.Element {
         <div className="p-2">
           <Button
             className="w-full"
+            disabled={!isInitialized && isOffline}
             size="sm"
+            title={
+              !isInitialized && isOffline
+                ? 'Sync service is initializing. Please wait...'
+                : undefined
+            }
             variant={isOffline ? 'default' : 'outline'}
             onClick={handleToggleSync}
           >
-            {isOffline ? 'Start Sync' : 'Stop Sync'}
+            {!isInitialized && isOffline
+              ? 'Initializing...'
+              : isOffline
+                ? 'Start Sync'
+                : 'Stop Sync'}
           </Button>
         </div>
       </PopoverContent>

@@ -101,10 +101,10 @@ export function TaskSidebar({
   return (
     <div className="space-y-4">
       {/* Task Lists */}
-      <Card className="rounded-xl border-border/40 bg-card">
-        <CardHeader className="pb-3">
+      <Card>
+        <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold">My Lists</CardTitle>
+            <CardTitle className="text-sm font-medium">My Lists</CardTitle>
             <Button
               className="h-6 w-6"
               size="icon"
@@ -127,11 +127,11 @@ export function TaskSidebar({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-1.5 pt-0">
+        <CardContent className="space-y-1 pt-0">
           {/* Create form */}
           {showCreateForm && (
             <form
-              className="mb-3 space-y-2 rounded-lg border border-border/40 bg-muted/30 p-3"
+              className="mb-3 space-y-2 rounded-md border p-2"
               onSubmit={(e) => void handleCreate(e)}
             >
               <div className="space-y-1">
@@ -176,11 +176,7 @@ export function TaskSidebar({
                   size="sm"
                   type="button"
                   variant="ghost"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setNewListName('');
-                    setNewListColor('blue');
-                  }}
+                  onClick={() => setShowCreateForm(false)}
                 >
                   Cancel
                 </Button>
@@ -197,37 +193,20 @@ export function TaskSidebar({
             taskLists.map((list) => {
               const isSelected = selectedListIds.includes(list.id);
               const colorClasses = TASK_LIST_COLORS[list.color] ?? TASK_LIST_COLORS.blue;
-              const completionPercentage =
-                list.totalTasks > 0 ? Math.round((list.completedTasks / list.totalTasks) * 100) : 0;
 
               return (
                 <ContextMenu key={list.id}>
                   <ContextMenuTrigger asChild>
                     <button
-                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all hover:bg-accent/50 ${
-                        isSelected ? 'bg-accent/30' : 'opacity-60'
+                      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50 ${
+                        isSelected ? '' : 'opacity-50'
                       }`}
                       onClick={() => onToggleList(list.id)}
                     >
                       <div
                         className={`h-3 w-3 shrink-0 rounded-sm ${colorClasses.bg} ${colorClasses.border} border`}
                       />
-                      <div className="min-w-0 flex-1">
-                        <span className="block truncate">{list.name}</span>
-                        {list.totalTasks > 0 && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <span>
-                              {list.completedTasks}/{list.totalTasks}
-                            </span>
-                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className={`h-full transition-all ${colorClasses.bg}`}
-                                style={{ width: `${completionPercentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <span className="flex-1 truncate">{list.name}</span>
                       {isSelected && (
                         <svg
                           className="h-4 w-4 shrink-0 text-primary"
@@ -336,33 +315,19 @@ export function TaskSidebar({
 
       {/* Quick stats */}
       {taskLists.length > 0 && (
-        <Card className="rounded-xl border-border/40 bg-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Summary</CardTitle>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Summary</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardContent className="space-y-2 pt-0">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground/70">Lists</span>
-              <Badge className="rounded-md" variant="secondary">
-                {taskLists.length}
-              </Badge>
+              <span className="text-muted-foreground">Lists</span>
+              <Badge variant="secondary">{taskLists.length}</Badge>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground/70">Showing</span>
-              <Badge className="rounded-md" variant="secondary">
+              <span className="text-muted-foreground">Showing</span>
+              <Badge variant="secondary">
                 {selectedListIds.length} of {taskLists.length}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground/70">Total Tasks</span>
-              <Badge className="rounded-md" variant="secondary">
-                {taskLists.reduce((sum, list) => sum + list.totalTasks, 0)}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground/70">Completed</span>
-              <Badge className="rounded-md" variant="secondary">
-                {taskLists.reduce((sum, list) => sum + list.completedTasks, 0)}
               </Badge>
             </div>
           </CardContent>

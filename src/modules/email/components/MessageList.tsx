@@ -8,12 +8,12 @@ import { useRef, useCallback, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { format, isToday, isYesterday, isThisYear } from 'date-fns';
 import { CheckCircle2, Circle, Inbox, Mail, MailOpen, Paperclip, Star } from 'lucide-react';
+import { Letter } from 'react-letter';
 
 import { cn } from '@/lib/utils';
 import { EmptyState, LoadingSpinner } from '@/shared/components';
 
 import { useEmailPreferencesStore } from '../stores/emailPreferences.store';
-import { generatePreview } from '../utils/sanitize';
 
 import type { EmailMessage, EmailThread } from '../types/Email.types';
 
@@ -52,6 +52,63 @@ function formatMessageDate(timestamp: number): string {
   return format(date, 'MM/dd/yy');
 }
 
+const PLACEHOLDER_IMAGE =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect width="100" height="100" fill="%23f0f0f0"/%3E%3Ctext x="50" y="50" font-size="12" text-anchor="middle" dy=".3em" fill="%23999"%3EImage blocked%3C/text%3E%3C/svg%3E';
+
+const rewriteExternalResource = (url: string): string => {
+  if (!url) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return PLACEHOLDER_IMAGE;
+    }
+  } catch {
+    return url;
+  }
+
+  return url;
+};
+
+function EmailPreview({
+  html,
+  text,
+  snippetLines,
+}: {
+  html?: string | undefined;
+  text?: string | undefined;
+  snippetLines: 1 | 2 | 3;
+}): JSX.Element {
+  const hasContent = Boolean(html?.trim() ?? text?.trim());
+
+  if (!hasContent) {
+    return <span className="text-sm text-muted-foreground">No preview available</span>;
+  }
+
+  return (
+    <div
+      className={cn(
+        'text-sm text-muted-foreground',
+        'overflow-hidden',
+        snippetLines === 1 && 'line-clamp-1',
+        snippetLines === 2 && 'line-clamp-2',
+        snippetLines === 3 && 'line-clamp-3'
+      )}
+    >
+      <Letter
+        allowedSchemas={['mailto', 'cid', 'data']}
+        className="email-preview"
+        html={html ?? ''}
+        rewriteExternalResources={rewriteExternalResource}
+        text={text ?? ''}
+        useIframe={false}
+      />
+    </div>
+  );
+}
+
 function MessageRow({
   message,
   isSelected,
@@ -79,9 +136,10 @@ function MessageRow({
   onDragEnd: () => void;
   isDragging: boolean;
 }): JSX.Element {
-  const previewText = useMemo(() => {
-    const source = message.textBody?.trim() ?? message.htmlBody?.trim() ?? message.snippet;
-    return generatePreview(source);
+  const previewContent = useMemo(() => {
+    const text = message.textBody?.trim() ?? message.snippet;
+    const html = message.htmlBody?.trim();
+    return { html, text };
   }, [message.htmlBody, message.snippet, message.textBody]);
 
   const handleStarClick = (e: React.MouseEvent): void => {
@@ -182,16 +240,11 @@ function MessageRow({
           )}
         </div>
         {showSnippets && (
-          <p
-            className={cn(
-              'text-sm text-muted-foreground',
-              snippetLines === 1 && 'line-clamp-1',
-              snippetLines === 2 && 'line-clamp-2',
-              snippetLines === 3 && 'line-clamp-3'
-            )}
-          >
-            {previewText}
-          </p>
+          <EmailPreview
+            html={previewContent.html}
+            snippetLines={snippetLines}
+            text={previewContent.text}
+          />
         )}
       </div>
 
@@ -220,7 +273,7 @@ function ThreadRow({
   onSelect: () => void;
   onCheckChange: (checked: boolean) => void;
 }): JSX.Element {
-  const previewText = useMemo(() => generatePreview(thread.snippet ?? ''), [thread.snippet]);
+  const previewText = useMemo(() => thread.snippet?.trim() ?? '', [thread.snippet]);
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -303,18 +356,7 @@ function ThreadRow({
             <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
         </div>
-        {showSnippets && (
-          <p
-            className={cn(
-              'text-sm text-muted-foreground',
-              snippetLines === 1 && 'line-clamp-1',
-              snippetLines === 2 && 'line-clamp-2',
-              snippetLines === 3 && 'line-clamp-3'
-            )}
-          >
-            {previewText}
-          </p>
-        )}
+        {showSnippets && <EmailPreview snippetLines={snippetLines} text={previewText} />}
       </div>
 
       {/* Participant count */}

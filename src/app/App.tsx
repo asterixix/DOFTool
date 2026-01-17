@@ -3,7 +3,9 @@ import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HashRouter } from 'react-router-dom';
 
+import { useCompactMode } from '@/hooks/useCompactMode';
 import { BRAND } from '@/shared/brand';
+import { createErrorDetails, reportCrash } from '@/shared/services/crashReporting';
 import { logToDebug } from '@/shared/utils/debugLogger';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -21,7 +23,13 @@ const queryClient = new QueryClient({
 });
 
 export function App(): JSX.Element {
+  // Apply compact mode styling
+  useCompactMode();
+
   useEffect(() => {
+    // Analytics is initialized in the main process (electron/main.ts)
+    // No need to initialize here in the renderer
+
     logToDebug({
       location: 'App:mount',
       message: 'App component mounted',
@@ -30,30 +38,44 @@ export function App(): JSX.Element {
 
     // Capture unhandled errors
     const handleError = (event: ErrorEvent): void => {
+      const errorDetails = createErrorDetails(event, {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      });
+
       logToDebug({
         location: 'App:unhandledError',
         message: 'Unhandled Error',
         data: {
-          message: event.message,
-          filename: event.filename,
-          lineno: event.lineno,
-          colno: event.colno,
-          error: event.error instanceof Error ? event.error.stack : undefined,
+          message: errorDetails.message,
+          filename: errorDetails.filename,
+          lineno: errorDetails.lineno,
+          colno: errorDetails.colno,
+          stack: errorDetails.stack,
         },
         hypothesisId: 'HYP_B',
       });
+
+      // Report crash if enabled
+      void reportCrash(errorDetails);
     };
 
     const handleRejection = (event: PromiseRejectionEvent): void => {
+      const errorDetails = createErrorDetails(event);
+
       logToDebug({
         location: 'App:unhandledRejection',
         message: 'Unhandled Promise Rejection',
         data: {
-          reason: String(event.reason),
-          stack: event.reason instanceof Error ? event.reason.stack : undefined,
+          reason: errorDetails.message,
+          stack: errorDetails.stack,
         },
         hypothesisId: 'HYP_B',
       });
+
+      // Report crash if enabled
+      void reportCrash(errorDetails);
     };
 
     window.addEventListener('error', handleError);

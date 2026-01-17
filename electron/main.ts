@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 
+import { initialize as initializeAptabase } from '@aptabase/electron/main';
 import {
   app,
   BrowserWindow,
@@ -12,7 +13,29 @@ import {
   nativeImage,
   crashReporter,
 } from 'electron';
+// Polyfill WebSocket for y-webrtc in Node.js/Electron main process
+// ws requires bufferutil as an optional dependency - handle gracefully
+// Use dynamic import to handle optional dependencies better
+let WebSocketClass: typeof WsWebSocket;
+try {
+  // ws will try to load bufferutil but should work without it
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const wsModule = require('ws') as { WebSocket: typeof WsWebSocket };
+  WebSocketClass = wsModule.WebSocket;
+  console.log('[Electron] WebSocket polyfill loaded from ws module');
+} catch (error) {
+  console.error('[Electron] Failed to load ws module:', error);
+  throw new Error(
+    'WebSocket polyfill (ws) is required for sync functionality. Please ensure ws is installed.'
+  );
+}
 
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = WebSocketClass as unknown as typeof globalThis.WebSocket;
+  console.log('[Electron] WebSocket polyfill set on globalThis');
+}
+
+import { AutoUpdaterService } from './services/AutoUpdaterService';
 import { EmailSearchService } from './services/EmailSearchService';
 import { EmailService } from './services/EmailService';
 import { testEmailConnections } from './services/EmailServiceConnectionTest';
@@ -27,6 +50,7 @@ import {
   type NotificationHistoryItem,
   type NotificationPriority,
 } from './services/NotificationService';
+import { ReminderSchedulingService } from './services/ReminderSchedulingService';
 import { StorageService } from './services/StorageService';
 import {
   SyncService,
@@ -38,6 +62,7 @@ import { YjsService, type YjsDocumentStructure } from './services/YjsService';
 
 import type { ImapConfig, SmtpConfig } from './services/EmailService';
 import type { Calendar, CalendarEvent } from '../src/modules/calendar/types/Calendar.types';
+import type { WebSocket as WsWebSocket } from 'ws';
 import type * as Y from 'yjs';
 
 // Interface declarations
@@ -51,7 +76,7 @@ export interface CalendarInfo {
   visibility: string;
   defaultPermission: string;
   sharedWith: Array<{ memberId: string; permission: string; sharedAt: number; sharedBy: string }>;
-  defaultReminders: Array<{ id: string; type: string; minutes: number }>;
+  defaultReminders: Array<{ id: string; minutes: number }>;
   timezone: string;
   createdAt: number;
   updatedAt: number;
@@ -103,7 +128,7 @@ export interface CalendarEventInfo {
     role: string;
     optional: boolean;
   }>;
-  reminders: Array<{ id: string; type: string; minutes: number }>;
+  reminders: Array<{ id: string; minutes: number }>;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
@@ -121,10 +146,11 @@ let emailService: EmailService | null = null;
 let emailSearchService: EmailSearchService | null = null;
 let externalCalendarSyncService: ExternalCalendarSyncService | null = null;
 let notificationService: NotificationService | null = null;
+let reminderSchedulingService: ReminderSchedulingService | null = null;
 let syncService: SyncService | null = null;
+let autoUpdaterService: AutoUpdaterService | null = null;
 let tray: Tray | null = null;
 let isQuiting = false;
-const reminderTimers: Map<string, NodeJS.Timeout[]> = new Map();
 // Email notification tracking - moved to persistent storage in fetchMessages handler
 const emittedTaskCompletion: Set<string> = new Set();
 
@@ -332,13 +358,14 @@ function createTray(): void {
 }
 
 function createWindow(): void {
+  console.log('[Electron] Creating main window...');
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    show: false,
+    show: isDev,
     backgroundColor: '#fffaf5',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 15, y: 15 },
@@ -353,29 +380,69 @@ function createWindow(): void {
     },
   });
 
+  const revealWindow = (reason: string): void => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+    if (!mainWindow.isVisible()) {
+      console.log(`[Electron] Revealing main window (${reason})`);
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  };
+
+  mainWindow.center();
+
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
+    console.log('[Electron] Window ready to show');
+    revealWindow('ready-to-show');
   });
 
   // Handle navigation errors
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
     console.error('Failed to load:', errorCode, errorDescription);
     // Don't quit on load failure - just log it
+    revealWindow('did-fail-load');
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[Electron] Renderer finished loading');
+    revealWindow('did-finish-load');
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[Electron] Renderer process gone:', details);
+    if (isDev && !isQuiting) {
+      setTimeout(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          createWindow();
+        }
+      }, 1000);
+    }
   });
 
   // Load the app
+  console.log('[Electron] Development mode:', isDev);
   if (isDev) {
+    console.log('[Electron] Loading from http://localhost:5173');
     mainWindow.loadURL('http://localhost:5173').catch((error) => {
       console.error('Failed to load URL:', error);
+      console.error('Make sure Vite dev server is running on port 5173');
     });
     // Auto-open DevTools in development mode
     mainWindow.webContents.openDevTools();
   } else {
+    console.log('[Electron] Loading from file:', path.join(__dirname, '../renderer/index.html'));
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html')).catch((error) => {
       console.error('Failed to load file:', error);
     });
   }
+
+  // Fallback: ensure the window becomes visible even if ready-to-show doesn't fire
+  setTimeout(() => {
+    revealWindow('fallback-timeout');
+  }, 5000);
 
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -385,6 +452,13 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    if (isDev && !isQuiting) {
+      setTimeout(() => {
+        if (!mainWindow) {
+          createWindow();
+        }
+      }, 1000);
+    }
   });
 
   mainWindow.on('close', (event) => {
@@ -512,6 +586,9 @@ async function initializeServices(): Promise<void> {
   try {
     console.log('Initializing core services...');
 
+    // Aptabase is already initialized before app.whenReady()
+    // No need to initialize here again
+
     // Initialize encryption service first (needed by others)
     encryptionService = new EncryptionService();
     await encryptionService.initialize();
@@ -522,6 +599,15 @@ async function initializeServices(): Promise<void> {
 
     notificationService = new NotificationService(storageService);
     await notificationService.initialize();
+
+    // Initialize reminder scheduling service
+    reminderSchedulingService = new ReminderSchedulingService(storageService, notificationService);
+    await reminderSchedulingService.initialize();
+
+    // Initialize auto-updater service
+    const currentVersion = safeApp().getVersion();
+    autoUpdaterService = new AutoUpdaterService(notificationService, currentVersion);
+    autoUpdaterService.setElectronModules({ shell, app: safeApp() });
 
     // Initialize Yjs service (doesn't need storage service)
     yjsService = new YjsService();
@@ -545,6 +631,13 @@ async function initializeServices(): Promise<void> {
     await loadAppSettings();
     applyAutoLaunchSetting();
     createTray();
+
+    // Check for updates on startup (don't wait, run in background)
+    if (autoUpdaterService) {
+      void autoUpdaterService.checkForUpdates(true).catch((error) => {
+        console.error('[AutoUpdater] Failed to check for updates on startup:', error);
+      });
+    }
 
     console.log('All core services initialized successfully');
   } catch (error) {
@@ -630,13 +723,17 @@ function getFamilyState(): FamilyState {
 // Initialize P2P sync service - runs in background to avoid blocking app startup
 function initializeSyncServiceAsync(): void {
   // Defer sync initialization to next tick to avoid blocking UI
+  console.log('[SyncService] initializeSyncServiceAsync called');
   setImmediate(() => {
+    console.log('[SyncService] setImmediate callback executing, calling initializeSyncServiceCore');
     void initializeSyncServiceCore();
   });
 }
 
 // Core sync initialization logic
 async function initializeSyncServiceCore(): Promise<void> {
+  console.log('[SyncService] Starting initialization...');
+
   if (!yjsService || !storageService) {
     console.error('[SyncService] Required services not initialized');
     return;
@@ -646,24 +743,36 @@ async function initializeSyncServiceCore(): Promise<void> {
     // Get device ID and family info
     const deviceId = (await storageService.get('device:id')) ?? crypto.randomUUID();
     const deviceName = (await storageService.get('device:name')) ?? os.hostname();
+    console.log('[SyncService] Device ID:', deviceId, 'Device name:', deviceName);
 
     let familyState: FamilyState;
     try {
       familyState = getFamilyState();
-    } catch {
-      console.error('[SyncService] Failed to get family state, will retry later');
+      console.log(
+        '[SyncService] Family state retrieved:',
+        familyState.family ? 'Family exists' : 'No family'
+      );
+    } catch (error) {
+      console.error('[SyncService] Failed to get family state:', error);
       // Retry after a delay if family state isn't ready
       setTimeout(() => void initializeSyncServiceCore(), 2000);
       return;
     }
 
     if (!familyState.family) {
-      console.error('[SyncService] No family configured, skipping sync service init');
+      console.log('[SyncService] No family configured yet, skipping sync service init');
+      console.log(
+        '[SyncService] Will initialize when family is created or when family:get is called'
+      );
       return;
     }
 
+    console.log('[SyncService] Family ID:', familyState.family.id);
+
     // Create and initialize sync service
+    console.log('[SyncService] Creating new SyncService instance...');
     syncService = new SyncService();
+    console.log('[SyncService] Calling syncService.initialize()...');
     await syncService.initialize(
       {
         deviceId,
@@ -672,11 +781,19 @@ async function initializeSyncServiceCore(): Promise<void> {
       },
       yjsService.getDocument()
     );
+    console.log(
+      '[SyncService] Initialization complete, isInitialized:',
+      syncService.isInitialized()
+    );
 
     // Set up event handlers to forward to renderer (throttled in SyncService)
     syncService.on('status-changed', (status: SyncStatus) => {
+      console.log('[SyncService] Status changed event received in main process:', status);
       if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log('[SyncService] Sending status to renderer:', status);
         mainWindow.webContents.send('sync:status-changed', status);
+      } else {
+        console.warn('[SyncService] Cannot send status: mainWindow not available');
       }
     });
 
@@ -702,9 +819,32 @@ async function initializeSyncServiceCore(): Promise<void> {
 
     // Start the sync service in next tick to avoid blocking
     setImmediate(() => {
-      if (syncService) {
-        syncService.start();
-        console.error('[SyncService] P2P sync service started');
+      if (syncService?.isInitialized()) {
+        try {
+          syncService.start();
+          console.log('[SyncService] P2P sync service started');
+
+          // Send initial status update to renderer
+          const initialStatus = syncService.getStatus();
+          console.log('[SyncService] Initial status after start:', initialStatus);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            console.log('[SyncService] Sending initial status to renderer');
+            mainWindow.webContents.send('sync:status-changed', initialStatus);
+          } else {
+            console.warn('[SyncService] Cannot send initial status: mainWindow not available');
+          }
+        } catch (error) {
+          console.error('[SyncService] Failed to start after initialization:', error);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('sync:status-changed', {
+              status: 'offline',
+              peerCount: 0,
+              lastSyncAt: null,
+            });
+          }
+        }
+      } else {
+        console.error('[SyncService] Cannot start: service not initialized');
       }
     });
   } catch (error) {
@@ -795,8 +935,33 @@ function initializeCrashReporter(): void {
 
 if (typeof app !== 'undefined') {
   initializeCrashReporter();
+
+  // Initialize Aptabase BEFORE app.whenReady() as per Aptabase documentation
+  // The initialize() function is async and will:
+  // 1. Register the aptabase-ipc scheme as privileged
+  // 2. Wait for app.whenReady() internally
+  // 3. Register the protocol handler and IPC handlers
+  // App key can come from environment variable or use default
+  const aptabaseKey =
+    process.env.VITE_APTABASE_APP_KEY ?? process.env.APTABASE_APP_KEY ?? 'A-EU-3534426174';
+  try {
+    void initializeAptabase(aptabaseKey);
+    console.log(
+      '[Analytics] Aptabase initialization started (protocol will be registered after app ready)'
+    );
+  } catch (error) {
+    console.error('[Analytics] Failed to start Aptabase initialization:', error);
+    // Don't throw - analytics failures shouldn't break app startup
+  }
+
   void app.whenReady().then(async () => {
     try {
+      // Give Aptabase a moment to complete protocol handler registration
+      // The initialize() function completes protocol registration after app.whenReady()
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+
       // Initialize services before creating window
       await initializeServices();
 
@@ -893,7 +1058,7 @@ process.on('exit', () => {
 if (typeof app !== 'undefined') {
   app.on('window-all-closed', () => {
     // On macOS, keep app running until explicitly quit
-    if (process.platform !== 'darwin') {
+    if (process.platform !== 'darwin' && !isDev) {
       app.quit();
     }
   });
@@ -947,46 +1112,29 @@ function emitModuleNotification(event: NotificationEvent): Promise<NotificationH
 }
 
 function clearEventReminders(eventId: string): void {
-  const timers = reminderTimers.get(eventId);
-  if (timers) {
-    timers.forEach((t) => clearTimeout(t));
-    reminderTimers.delete(eventId);
+  if (reminderSchedulingService) {
+    reminderSchedulingService.clearEventReminders(eventId);
   }
 }
 
 function scheduleEventReminders(event: CalendarEventInfo): void {
-  clearEventReminders(event.id);
-  if (!event.reminders?.length) {
-    return;
-  }
-
-  const timers: NodeJS.Timeout[] = [];
-  const now = Date.now();
-
-  for (const reminder of event.reminders) {
-    const minutes = reminder.minutes ?? 0;
-    const triggerAt = event.start - minutes * 60_000;
-    const delay = triggerAt - now;
-    if (delay <= 0) {
-      continue; // Skip past reminders
-    }
-
-    const priority: NotificationPriority = minutes <= 5 ? 'urgent' : 'normal';
-    const timeout = setTimeout(() => {
-      void emitModuleNotification({
-        module: 'calendar',
-        title: `Reminder: ${event.title}`,
-        body: `Starts at ${new Date(event.start).toLocaleString()}`,
-        priority,
-        data: { eventId: event.id, calendarId: event.calendarId },
-      });
-    }, delay);
-
-    timers.push(timeout);
-  }
-
-  if (timers.length > 0) {
-    reminderTimers.set(event.id, timers);
+  if (reminderSchedulingService) {
+    reminderSchedulingService.scheduleEventReminders({
+      id: event.id,
+      calendarId: event.calendarId,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      category: event.category,
+      reminders: event.reminders.map((r) => ({
+        id: r.id,
+        minutes: r.minutes,
+        enabled: true,
+      })),
+    });
   }
 }
 
@@ -1020,20 +1168,7 @@ function emitTaskNotification(
   });
 }
 
-function emitEmailNotification(
-  title: string,
-  body: string | undefined,
-  data: Record<string, unknown>,
-  priority: NotificationPriority = 'normal'
-): void {
-  void emitModuleNotification({
-    module: 'email',
-    title,
-    body,
-    data,
-    priority,
-  });
-}
+// emitEmailNotification - Reserved for future Email module (currently blocked/building)
 
 // ============================================================================
 // Calendar IPC Helpers
@@ -1166,6 +1301,69 @@ if (typeof ipcMain !== 'undefined') {
 
   ipcMain.handle('app:platform', () => {
     return process.platform;
+  });
+
+  ipcMain.handle('app:openExternal', async (_event, url: string) => {
+    try {
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to open URL';
+      console.error('Failed to open external URL:', error);
+      return { success: false, error: message };
+    }
+  });
+
+  // Analytics handler - routes to Aptabase main process trackEvent
+  ipcMain.handle(
+    'analytics:track',
+    async (_event, eventName: string, props?: Record<string, string | number | boolean>) => {
+      try {
+        // Import trackEvent from main process SDK dynamically to avoid issues if not initialized
+        const { trackEvent } = await import('@aptabase/electron/main');
+        await trackEvent(eventName, props);
+        return { success: true };
+      } catch (error) {
+        // Silently fail - analytics errors shouldn't break the app
+        console.error('[Analytics] Failed to track event:', error);
+        return { success: false };
+      }
+    }
+  );
+
+  // Auto-updater handlers
+  console.log('[IPC] Registering updater handlers...');
+  ipcMain.handle('updater:check', async (_event, notifyIfAvailable?: boolean) => {
+    if (!autoUpdaterService) {
+      return {
+        version: safeApp().getVersion(),
+        currentVersion: safeApp().getVersion(),
+        hasUpdate: false,
+      };
+    }
+    return await autoUpdaterService.checkForUpdates(notifyIfAvailable ?? false);
+  });
+
+  ipcMain.handle('updater:download', async (_event, releaseUrl?: string) => {
+    if (!autoUpdaterService) {
+      return { success: false, error: 'Auto-updater service not initialized' };
+    }
+    return await autoUpdaterService.downloadUpdate(releaseUrl);
+  });
+
+  ipcMain.handle('updater:install', async () => {
+    if (!autoUpdaterService) {
+      return { success: false, error: 'Auto-updater service not initialized' };
+    }
+    await autoUpdaterService.quitAndInstall();
+    return { success: true };
+  });
+
+  ipcMain.handle('updater:lastChecked', () => {
+    if (!autoUpdaterService) {
+      return null;
+    }
+    return autoUpdaterService.getLastCheckedAt();
   });
 
   ipcMain.handle('notifications:getPreferences', () => {
@@ -1418,7 +1616,17 @@ if (typeof ipcMain !== 'undefined') {
       ? { ...existing, lastSeen: Date.now(), isCurrent: true }
       : device;
     devicesMap.set(device.id, mergedDevice);
-    return getFamilyState();
+    const familyState = getFamilyState();
+
+    // If family exists but sync service isn't initialized, initialize it
+    if (familyState.family && !syncService?.isInitialized()) {
+      console.log(
+        '[SyncService] Family exists but sync service not initialized, initializing now...'
+      );
+      void initializeSyncServiceCore();
+    }
+
+    return familyState;
   });
 
   ipcMain.handle('family:create', async (_event, name: string) => {
@@ -1459,7 +1667,25 @@ if (typeof ipcMain !== 'undefined') {
     };
     permissionsMap.set(permission.memberId, permission);
 
-    return getFamilyState();
+    const familyState = getFamilyState();
+
+    // Re-initialize sync service now that family exists
+    console.log('[SyncService] Family created, checking sync service state...');
+    if (!syncService?.isInitialized()) {
+      console.log('[SyncService] Sync service not initialized, starting initialization...');
+      void initializeSyncServiceCore();
+    } else {
+      // If already initialized, restart with new family ID
+      console.log(
+        '[SyncService] Sync service already initialized, restarting with new family ID...'
+      );
+      syncService.stop();
+      syncService.destroy();
+      syncService = null;
+      void initializeSyncServiceCore();
+    }
+
+    return familyState;
   });
 
   ipcMain.handle('family:invite', (_event, role: PermissionRole) => {
@@ -1542,15 +1768,50 @@ if (typeof ipcMain !== 'undefined') {
   // ============================================================================
 
   ipcMain.handle('sync:status', () => {
+    console.log('[IPC] sync:status called, syncService exists:', !!syncService);
+
+    // Check if family exists and trigger initialization if needed
+    try {
+      const familyState = getFamilyState();
+      if (familyState.family && !syncService?.isInitialized()) {
+        console.log(
+          '[IPC] sync:status - Family exists but sync not initialized, triggering init...'
+        );
+        void initializeSyncServiceCore();
+      }
+    } catch (error) {
+      console.error('[IPC] sync:status - Error checking family state:', error);
+    }
+
     if (!syncService) {
+      console.log('[IPC] sync:status - returning offline (no service)');
       return {
         status: 'offline' as const,
         peerCount: 0,
         lastSyncAt: null,
-        error: 'Sync service not initialized',
+        error: 'Sync service not available',
+        isInitialized: false,
       };
     }
-    return syncService.getStatus();
+    const status = syncService.getStatus();
+    const isInitialized = syncService.isInitialized();
+    console.log('[IPC] sync:status - returning:', { ...status, isInitialized });
+    return {
+      ...status,
+      isInitialized,
+    };
+  });
+
+  // Add handler to manually trigger initialization
+  ipcMain.handle('sync:initialize', async () => {
+    console.log('[IPC] sync:initialize called manually');
+    try {
+      await initializeSyncServiceCore();
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] sync:initialize failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
   });
 
   ipcMain.handle('sync:force', () => {
@@ -1576,12 +1837,21 @@ if (typeof ipcMain !== 'undefined') {
 
   ipcMain.handle('sync:start', () => {
     if (!syncService) {
+      return { success: false, error: 'Sync service not available' };
+    }
+    if (!syncService.isInitialized()) {
       return { success: false, error: 'Sync service not initialized' };
     }
-    if (!syncService.isActive()) {
-      syncService.start();
+    try {
+      if (!syncService.isActive()) {
+        syncService.start();
+      }
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[IPC] sync:start error:', error);
+      return { success: false, error: errorMessage };
     }
-    return { success: true };
   });
 
   ipcMain.handle('sync:stop', () => {
@@ -1659,7 +1929,7 @@ if (typeof ipcMain !== 'undefined') {
         visibility: data.visibility,
         defaultPermission: 'view',
         sharedWith: [],
-        defaultReminders: [{ id: crypto.randomUUID(), type: 'notification', minutes: 15 }],
+        defaultReminders: [{ id: crypto.randomUUID(), minutes: 15 }],
         timezone: data.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -1817,7 +2087,7 @@ if (typeof ipcMain !== 'undefined') {
         recurrence?: CalendarEventInfo['recurrence'];
         category?: string;
         color?: string;
-        reminders?: Array<{ id: string; type: string; minutes: number }>;
+        reminders?: Array<{ id: string; minutes: number }>;
         attendees?: CalendarEventInfo['attendees'];
       }
     ) => {
@@ -1887,7 +2157,7 @@ if (typeof ipcMain !== 'undefined') {
         busyStatus: string;
         category: string;
         color: string;
-        reminders: Array<{ id: string; type: string; minutes: number }>;
+        reminders: Array<{ id: string; minutes: number }>;
         attendees: CalendarEventInfo['attendees'];
       }>
     ) => {
@@ -2029,7 +2299,6 @@ if (typeof ipcMain !== 'undefined') {
             reminders:
               eventInput.reminders?.map((r) => ({
                 id: r.id,
-                type: r.type,
                 minutes: r.minutes,
               })) ?? [],
             createdBy: eventInput.createdBy,
@@ -2131,7 +2400,6 @@ if (typeof ipcMain !== 'undefined') {
         })),
         reminders: event.reminders.map((r) => ({
           id: r.id,
-          type: r.type as 'notification' | 'email' | 'popup',
           minutes: r.minutes,
         })),
         createdBy: event.createdBy,
@@ -2269,6 +2537,28 @@ if (typeof ipcMain !== 'undefined') {
       return updatedShare;
     }
   );
+
+  // ============================================================================
+  // Calendar Reminder Settings IPC Handlers
+  // ============================================================================
+
+  // Get reminder settings
+  ipcMain.handle('calendar:reminderSettings:get', () => {
+    if (!reminderSchedulingService) {
+      throw new Error('ReminderSchedulingService not initialized');
+    }
+    return reminderSchedulingService.getSettings();
+  });
+
+  // Update reminder settings
+  ipcMain.handle('calendar:reminderSettings:update', async (_event, update: unknown) => {
+    if (!reminderSchedulingService) {
+      throw new Error('ReminderSchedulingService not initialized');
+    }
+    return reminderSchedulingService.updateSettings(
+      update as Parameters<typeof reminderSchedulingService.updateSettings>[0]
+    );
+  });
 
   // Stop sharing calendar with a member
   ipcMain.handle(
@@ -3851,21 +4141,25 @@ if (typeof ipcMain !== 'undefined') {
           notifiedJson ? (JSON.parse(notifiedJson) as string[]) : []
         );
 
-        let hasNewNotifications = false;
+        // Email notifications blocked - module is building
+        // Email notification code is disabled while module is being rebuilt
+        const hasNewNotifications = false;
 
-        for (const message of messages) {
-          // Only notify for unread messages that haven't been notified before
-          if (!message.read && !notifiedEmailMessageIds.has(message.id)) {
-            emitEmailNotification('New email', message.subject, {
-              accountId,
-              folder,
-              uid: message.uid,
-              messageId: message.id,
-            });
-            notifiedEmailMessageIds.add(message.id);
-            hasNewNotifications = true;
-          }
-        }
+        // NOTE: Email notifications are disabled - module is building
+        // Original email notification code (disabled):
+        // for (const message of messages) {
+        //   // Only notify for unread messages that haven't been notified before
+        //   if (!message.read && !notifiedEmailMessageIds.has(message.id)) {
+        //     emitEmailNotification('New email', message.subject, {
+        //       accountId,
+        //       folder,
+        //       uid: message.uid,
+        //       messageId: message.id,
+        //     });
+        //     notifiedEmailMessageIds.add(message.id);
+        //     hasNewNotifications = true;
+        //   }
+        // }
 
         // Persist updated notified message IDs if there were new notifications
         if (hasNewNotifications) {

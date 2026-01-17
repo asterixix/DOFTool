@@ -24,6 +24,13 @@ import {
   type EventCategory,
 } from '../types/Calendar.types';
 import { describeRecurrence } from '../utils/recurrence';
+import {
+  getSystemTimezone,
+  getCommonTimezones,
+  parseTimestampInTimezone,
+  createTimestampInTimezone,
+  getTimezoneDisplayName,
+} from '../utils/timezoneHelpers';
 
 interface EventEditorProps {
   event: CalendarEvent | null;
@@ -46,6 +53,7 @@ export interface EventFormData {
   start: number;
   end: number;
   allDay: boolean;
+  timezone: string | undefined;
   recurrence: RecurrenceRule | undefined;
   category: EventCategory | undefined;
   color: CalendarColor | undefined;
@@ -80,9 +88,16 @@ export function EventEditor({
   const [recurrence, setRecurrence] = useState<RecurrenceRule | null>(event?.recurrence ?? null);
   const [category, setCategory] = useState<EventCategory | undefined>(event?.category);
   const [color, setColor] = useState<CalendarColor | undefined>(event?.color);
-  const [reminders, setReminders] = useState<number[]>(
-    event?.reminders?.map((r) => r.minutes) ?? [15]
+  const [reminders, setReminders] = useState<EventReminder[]>(
+    event?.reminders?.length
+      ? event.reminders
+      : [{ id: crypto.randomUUID(), minutes: 15, enabled: true }]
   );
+
+  // Get calendar timezone or default to system timezone
+  const selectedCalendar = calendars.find((cal) => cal.id === calendarId);
+  const defaultTimezone = event?.timezone ?? selectedCalendar?.timezone ?? getSystemTimezone();
+  const [timezone, setTimezone] = useState<string>(defaultTimezone);
 
   // Initialize dates
   useEffect(() => {
@@ -90,14 +105,28 @@ export function EventEditor({
     // Use provided end date, or event end, or default to 1 hour after start
     const defaultEnd = event?.end ?? defaultEndDate ?? defaultStart + 60 * 60 * 1000; // 1 hour later
 
-    const start = new Date(defaultStart);
-    const end = new Date(defaultEnd);
+    // Parse dates in the event's timezone (or calendar/system timezone)
+    const eventTimezone = event?.timezone ?? selectedCalendar?.timezone ?? getSystemTimezone();
 
-    setStartDate(format(start, 'yyyy-MM-dd'));
-    setStartTime(format(start, 'HH:mm'));
-    setEndDate(format(end, 'yyyy-MM-dd'));
-    setEndTime(format(end, 'HH:mm'));
-  }, [event, defaultDate, defaultEndDate]);
+    if (eventTimezone && !event?.allDay) {
+      // Parse in the event's timezone
+      const startParts = parseTimestampInTimezone(defaultStart, eventTimezone);
+      const endParts = parseTimestampInTimezone(defaultEnd, eventTimezone);
+      setStartDate(startParts.date);
+      setStartTime(startParts.time);
+      setEndDate(endParts.date);
+      setEndTime(endParts.time);
+      setTimezone(eventTimezone);
+    } else {
+      // Use local time (legacy behavior for all-day events or no timezone)
+      const start = new Date(defaultStart);
+      const end = new Date(defaultEnd);
+      setStartDate(format(start, 'yyyy-MM-dd'));
+      setStartTime(format(start, 'HH:mm'));
+      setEndDate(format(end, 'yyyy-MM-dd'));
+      setEndTime(format(end, 'HH:mm'));
+    }
+  }, [event, defaultDate, defaultEndDate, selectedCalendar]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -142,11 +171,20 @@ export function EventEditor({
     let end: number;
 
     if (allDay) {
+      // All-day events are timezone-independent (use local time for simplicity)
       start = new Date(startDate + 'T00:00:00').getTime();
       end = new Date(endDate + 'T23:59:59').getTime();
     } else {
-      start = new Date(startDate + 'T' + startTime).getTime();
-      end = new Date(endDate + 'T' + endTime).getTime();
+      // For timed events, interpret the date/time in the selected timezone
+      try {
+        start = createTimestampInTimezone(startDate, startTime, timezone);
+        end = createTimestampInTimezone(endDate, endTime, timezone);
+      } catch (error) {
+        // Fallback to local time if timezone conversion fails
+        console.warn('Timezone conversion failed, using local time:', error);
+        start = new Date(startDate + 'T' + startTime).getTime();
+        end = new Date(endDate + 'T' + endTime).getTime();
+      }
     }
 
     const formData: EventFormData = {
@@ -158,14 +196,11 @@ export function EventEditor({
       start,
       end,
       allDay,
+      timezone: allDay ? undefined : timezone,
       recurrence: recurrence ?? undefined,
       category,
       color,
-      reminders: reminders.map((minutes, index) => ({
-        id: `reminder-${index}`,
-        type: 'notification' as const,
-        minutes,
-      })),
+      reminders: reminders.filter((r) => r.enabled !== false),
     };
 
     await onSave(formData);
@@ -179,7 +214,7 @@ export function EventEditor({
 
   const addReminder = (): void => {
     if (reminders.length < 5) {
-      setReminders([...reminders, 15]);
+      setReminders([...reminders, { id: crypto.randomUUID(), minutes: 15, enabled: true }]);
     }
   };
 
@@ -187,10 +222,13 @@ export function EventEditor({
     setReminders(reminders.filter((_, i) => i !== index));
   };
 
-  const updateReminder = (index: number, minutes: number): void => {
+  const updateReminderMinutes = (index: number, minutes: number): void => {
     const newReminders = [...reminders];
-    newReminders[index] = minutes;
-    setReminders(newReminders);
+    const existing = newReminders[index];
+    if (existing) {
+      newReminders[index] = { ...existing, minutes };
+      setReminders(newReminders);
+    }
   };
 
   const colorOptions: CalendarColor[] = [
@@ -205,9 +243,29 @@ export function EventEditor({
     'pink',
   ];
 
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+    // Close dialog if clicking on the backdrop (not on the card or its children)
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="max-h-[90vh] w-full max-w-lg overflow-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="button"
+      tabIndex={0}
+      onClick={handleBackdropClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      }}
+    >
+      <Card
+        className="max-h-[90vh] w-full max-w-lg overflow-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>{isEditing ? 'Edit Event' : 'New Event'}</CardTitle>
           <Button size="icon" variant="ghost" onClick={onClose}>
@@ -272,35 +330,63 @@ export function EventEditor({
             </div>
 
             {/* Date/Time */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start</Label>
-                <Input
-                  required
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-                {!allDay && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start</Label>
                   <Input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    required
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
                   />
-                )}
+                  {!allDay && (
+                    <Input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                    />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>End</Label>
+                  <Input
+                    required
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                  {!allDay && (
+                    <Input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>End</Label>
-                <Input
-                  required
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-                {!allDay && (
-                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                )}
-              </div>
+              {!allDay && (
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Time Zone</Label>
+                  <select
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    id="timezone"
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                  >
+                    {getCommonTimezones().map((tz) => (
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label} ({tz.offset})
+                      </option>
+                    ))}
+                  </select>
+                  {timezone && (
+                    <p className="text-xs text-muted-foreground">
+                      Times will be displayed in {getTimezoneDisplayName(timezone)}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Recurrence */}
@@ -412,12 +498,12 @@ export function EventEditor({
                   </Button>
                 )}
               </div>
-              {reminders.map((minutes, index) => (
-                <div key={index} className="flex items-center gap-2">
+              {reminders.map((reminder, index) => (
+                <div key={reminder.id ?? index} className="flex items-center gap-2">
                   <select
                     className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-                    value={minutes}
-                    onChange={(e) => updateReminder(index, parseInt(e.target.value))}
+                    value={reminder.minutes}
+                    onChange={(e) => updateReminderMinutes(index, parseInt(e.target.value))}
                   >
                     {REMINDER_PRESETS.map((preset) => (
                       <option key={preset.minutes} value={preset.minutes}>

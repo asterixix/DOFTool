@@ -114,8 +114,8 @@ const defaultNotificationSettings: NotificationSettings = {
 };
 
 const defaultPrivacySettings: PrivacySettings = {
-  analyticsEnabled: false,
-  crashReportsEnabled: false,
+  analyticsEnabled: true, // Enabled by default on first run
+  crashReportsEnabled: true, // Enabled by default on first run
 };
 
 const defaultTutorialState: TutorialState = {

@@ -18,12 +18,14 @@ interface SyncAPI {
     peerCount: number;
     lastSyncAt: number | null;
     error?: string;
+    isInitialized?: boolean;
   }>;
   forceSync: () => Promise<{ success: boolean }>;
   getPeers: () => Promise<PeerInfo[]>;
   start: () => Promise<{ success: boolean }>;
   stop: () => Promise<{ success: boolean }>;
   getDiscoveredPeers: () => Promise<DiscoveredPeerInfo[]>;
+  initialize: () => Promise<{ success: boolean; error?: string }>;
 }
 
 /** Get sync API from window.electronAPI */
@@ -46,6 +48,7 @@ interface UseSyncReturn {
   error: string | null;
   isConnected: boolean;
   statusText: string;
+  isInitialized: boolean;
 
   // Actions
   refreshStatus: () => Promise<void>;
@@ -61,16 +64,28 @@ export function useSync(): UseSyncReturn {
   // Refresh sync status from main process
   const refreshStatus = useCallback(async (): Promise<void> => {
     try {
+      // eslint-disable-next-line no-console
+      console.log('[useSync] Calling sync:status IPC...');
       const api = getSyncAPI();
       const status = await api.getStatus();
+      // eslint-disable-next-line no-console
+      console.log('[useSync] Received status from IPC:', status);
       store.setStatus(status.status);
       store.setPeerCount(status.peerCount);
       store.setLastSyncAt(status.lastSyncAt);
       store.setError(status.error ?? null);
-      store.setInitialized(true);
+      store.setInitialized(status.isInitialized ?? false);
+      // eslint-disable-next-line no-console
+      console.log(
+        '[useSync] Store updated - isInitialized:',
+        status.isInitialized,
+        'status:',
+        status.status
+      );
     } catch (error) {
       console.error('[useSync] Failed to refresh status:', error);
       store.setError(error instanceof Error ? error.message : 'Failed to get sync status');
+      store.setInitialized(false);
     }
   }, [store]);
 
@@ -109,19 +124,39 @@ export function useSync(): UseSyncReturn {
   // Start sync service
   const startSync = useCallback(async (): Promise<boolean> => {
     try {
+      // First check if service is initialized
       const api = getSyncAPI();
+      const status = await api.getStatus();
+
+      if (!status.isInitialized) {
+        // Service not initialized yet - wait a bit and retry
+        // eslint-disable-next-line no-console
+        console.log('[useSync] Sync service not initialized, waiting...');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Check again
+        const retryStatus = await api.getStatus();
+        if (!retryStatus.isInitialized) {
+          store.setError('Sync service is initializing. Please wait a moment and try again.');
+          return false;
+        }
+      }
+
       const result = await api.start();
       if (!result.success) {
-        console.error('[useSync] Start sync failed:', (result as { error?: string }).error);
+        const errorMsg = (result as { error?: string }).error ?? 'Unknown error';
+        console.error('[useSync] Start sync failed:', errorMsg);
+        store.setError(errorMsg);
         return false;
       }
       await refreshStatus();
       return true;
     } catch (error) {
       console.error('[useSync] Failed to start sync:', error);
+      store.setError(error instanceof Error ? error.message : 'Failed to start sync');
       return false;
     }
-  }, [refreshStatus]);
+  }, [refreshStatus, store]);
 
   // Stop sync service
   const stopSync = useCallback(async (): Promise<boolean> => {
@@ -233,12 +268,41 @@ export function useSync(): UseSyncReturn {
       syncListenersSetupRef.current = true;
 
       // Subscribe to events
-      electronAPI.on('sync:status-changed', statusHandler);
+      // eslint-disable-next-line no-console
+      console.log('[useSync] Setting up event listeners...');
+      electronAPI.on('sync:status-changed', (status: unknown) => {
+        // eslint-disable-next-line no-console
+        console.log('[useSync] Received status-changed event:', status);
+        statusHandler(status);
+      });
       electronAPI.on('sync:peer-connected', peerConnectedHandler);
       electronAPI.on('sync:peer-disconnected', peerDisconnectedHandler);
 
-      // Initial refresh
-      void refreshStatus();
+      // Initial refresh and try to initialize if needed
+      // eslint-disable-next-line no-console
+      console.log('[useSync] Performing initial status refresh...');
+      void refreshStatus().then(async () => {
+        // If not initialized, try to initialize
+        const api = getSyncAPI();
+        const status = await api.getStatus();
+        if (!status.isInitialized) {
+          // eslint-disable-next-line no-console
+          console.log('[useSync] Sync not initialized, attempting to initialize...');
+          try {
+            const result = await api.initialize();
+            if (result.success) {
+              // eslint-disable-next-line no-console
+              console.log('[useSync] Sync initialization triggered successfully');
+              // Refresh status after initialization
+              setTimeout(() => void refreshStatus(), 1000);
+            } else {
+              console.error('[useSync] Sync initialization failed:', result.error);
+            }
+          } catch (error) {
+            console.error('[useSync] Error calling initialize:', error);
+          }
+        }
+      });
       void refreshPeers();
     } else {
       // Update the store instance to current one
@@ -279,6 +343,7 @@ export function useSync(): UseSyncReturn {
     error: store.error,
     isConnected: store.isConnected(),
     statusText: store.getSyncStatusText(),
+    isInitialized: store.isInitialized,
 
     // Actions
     refreshStatus,

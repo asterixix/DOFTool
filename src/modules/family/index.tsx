@@ -2,10 +2,12 @@
  * Family Module - Main entry point
  */
 
+import { motion } from 'framer-motion';
 import { Routes, Route } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { ErrorBanner } from '@/shared/components';
 
 import {
@@ -41,8 +43,20 @@ function FamilyOverview(): JSX.Element {
     clearError,
   } = useFamily();
 
+  const shouldReduceMotion = useReducedMotion();
+  const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
+  const cardVariants = {
+    initial: shouldReduceMotion ? {} : { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+  };
+
   return (
-    <div className="h-full space-y-6 p-4">
+    <motion.div
+      animate={{ opacity: 1 }}
+      className="min-h-full space-y-6 p-4"
+      initial={{ opacity: 0 }}
+      transition={transition}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -62,22 +76,43 @@ function FamilyOverview(): JSX.Element {
       {/* Main content grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Family setup */}
-        <FamilySetupCard family={family} isCreating={isCreating} onCreateFamily={createFamily} />
+        <motion.div
+          animate="animate"
+          initial="initial"
+          transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.05 }}
+          variants={cardVariants}
+        >
+          <FamilySetupCard family={family} isCreating={isCreating} onCreateFamily={createFamily} />
+        </motion.div>
 
         {/* Join family (only show if no family) */}
         {!hasFamily && (
-          <JoinFamilyCard hasFamily={hasFamily} isJoining={isJoining} onJoinFamily={joinFamily} />
+          <motion.div
+            animate="animate"
+            initial="initial"
+            transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.1 }}
+            variants={cardVariants}
+          >
+            <JoinFamilyCard hasFamily={hasFamily} isJoining={isJoining} onJoinFamily={joinFamily} />
+          </motion.div>
         )}
 
         {/* Invitations (only show if has family) */}
         {hasFamily && (
-          <InvitationCard
-            hasFamily={hasFamily}
-            isInviting={isInviting}
-            pendingInvite={pendingInvite}
-            onClearInvite={clearInvite}
-            onGenerateInvite={generateInvite}
-          />
+          <motion.div
+            animate="animate"
+            initial="initial"
+            transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.1 }}
+            variants={cardVariants}
+          >
+            <InvitationCard
+              hasFamily={hasFamily}
+              isInviting={isInviting}
+              pendingInvite={pendingInvite}
+              onClearInvite={clearInvite}
+              onGenerateInvite={generateInvite}
+            />
+          </motion.div>
         )}
       </div>
 
@@ -87,19 +122,33 @@ function FamilyOverview(): JSX.Element {
           <Separator />
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <DevicesCard devices={devices} isAdmin={isAdmin} onRemoveDevice={removeDevice} />
+            <motion.div
+              animate="animate"
+              initial="initial"
+              transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.15 }}
+              variants={cardVariants}
+            >
+              <DevicesCard devices={devices} isAdmin={isAdmin} onRemoveDevice={removeDevice} />
+            </motion.div>
 
-            <PermissionsCard
-              currentDeviceId={currentDevice?.id}
-              devices={devices}
-              isAdmin={isAdmin}
-              permissions={permissions}
-              onSetPermission={setPermission}
-            />
+            <motion.div
+              animate="animate"
+              initial="initial"
+              transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.2 }}
+              variants={cardVariants}
+            >
+              <PermissionsCard
+                currentDeviceId={currentDevice?.id}
+                devices={devices}
+                isAdmin={isAdmin}
+                permissions={permissions}
+                onSetPermission={setPermission}
+              />
+            </motion.div>
           </div>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 

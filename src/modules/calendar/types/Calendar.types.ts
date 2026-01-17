@@ -245,13 +245,23 @@ export const ATTENDEE_RESPONSE_LABELS: Record<AttendeeResponse, string> = {
 
 export interface EventReminder {
   id: string;
-  type: ReminderType;
   minutes: number; // Minutes before event
   sent?: boolean;
   sentAt?: number;
+  enabled?: boolean; // Allow disabling individual reminders
 }
 
-export type ReminderType = 'notification' | 'email' | 'popup';
+export interface ReminderPreferences {
+  enabled: boolean;
+  categories?: EventCategory[] | undefined; // Only trigger for specific categories (undefined = all)
+  minMinutesBefore?: number | undefined; // Don't trigger reminders less than X minutes before
+  maxRemindersPerEvent?: number | undefined; // Limit number of reminders per event
+}
+
+export interface ReminderSettings {
+  global: ReminderPreferences;
+  calendarOverrides?: Record<string, Partial<ReminderPreferences>>; // Per-calendar overrides
+}
 
 export const REMINDER_PRESETS = [
   { label: 'At time of event', minutes: 0 },
@@ -265,6 +275,13 @@ export const REMINDER_PRESETS = [
   { label: '2 days before', minutes: 2880 },
   { label: '1 week before', minutes: 10080 },
 ];
+
+export const DEFAULT_REMINDER_PREFERENCES: ReminderPreferences = {
+  enabled: true,
+  categories: undefined,
+  minMinutesBefore: 0,
+  maxRemindersPerEvent: 5,
+};
 
 // ============================================================================
 // Recurrence Types (RFC 5545)

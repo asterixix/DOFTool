@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 
+import { createErrorDetails, reportCrash } from '@/shared/services/crashReporting';
 import { logToDebug } from '@/shared/utils/debugLogger';
 
 interface Props {
@@ -36,6 +37,15 @@ export class ErrorBoundary extends Component<Props, State> {
     });
     // #endregion
 
+    // Report crash if enabled
+    const errorDetails = createErrorDetails(error);
+    errorDetails.stack = error.stack ?? undefined;
+    // Add component stack to error details
+    if (errorInfo.componentStack) {
+      errorDetails.stack = `${errorDetails.stack ?? ''}\n\nComponent Stack:\n${errorInfo.componentStack}`;
+    }
+    void reportCrash(errorDetails);
+
     this.setState({ errorInfo });
   }
 
@@ -62,13 +72,33 @@ export class ErrorBoundary extends Component<Props, State> {
                 </pre>
               </details>
             )}
-            <button
-              className="mt-4 rounded-lg bg-primary px-4 py-2 text-primary-foreground"
-              type="button"
-              onClick={() => void window.location.reload()}
-            >
-              Reload Page
-            </button>
+            <div className="mt-4 flex gap-2">
+              <button
+                className="rounded-lg bg-primary px-4 py-2 text-primary-foreground"
+                type="button"
+                onClick={() => void window.location.reload()}
+              >
+                Reload Page
+              </button>
+              {this.state.error && (
+                <button
+                  className="rounded-lg border border-border bg-background px-4 py-2 text-foreground hover:bg-muted"
+                  type="button"
+                  onClick={() => {
+                    if (!this.state.error) {
+                      return;
+                    }
+                    const errorDetails = createErrorDetails(this.state.error);
+                    if (this.state.errorInfo?.componentStack) {
+                      errorDetails.stack = `${errorDetails.stack ?? ''}\n\nComponent Stack:\n${this.state.errorInfo.componentStack}`;
+                    }
+                    void reportCrash(errorDetails);
+                  }}
+                >
+                  Report on GitHub
+                </button>
+              )}
+            </div>
           </div>
         </div>
       );

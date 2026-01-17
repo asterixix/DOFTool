@@ -7,6 +7,7 @@
 import { useState } from 'react';
 
 import { formatDistanceToNow } from 'date-fns';
+import { motion } from 'framer-motion';
 import { Bell, BellOff, Calendar, CheckSquare, Mail, Settings, Trash2, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
   type NotificationHistoryItem,
   type NotificationModule,
 } from '@/hooks/useNotifications';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 
 import type { LucideIcon } from 'lucide-react';
@@ -30,16 +32,27 @@ const moduleIcons: Record<NotificationModule, LucideIcon> = {
   system: Settings,
 };
 
-function NotificationItem({ item }: { item: NotificationHistoryItem }): JSX.Element {
+function NotificationItem({
+  item,
+  index = 0,
+}: {
+  item: NotificationHistoryItem;
+  index?: number;
+}): JSX.Element {
   const Icon = moduleIcons[item.module] || Bell;
   const timeAgo = formatDistanceToNow(new Date(item.createdAt), { addSuffix: true });
+  const shouldReduceMotion = useReducedMotion();
+  const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
 
   return (
-    <div
+    <motion.div
+      animate={{ opacity: 1, x: 0 }}
       className={cn(
         'flex gap-3 rounded-lg p-3 transition-colors hover:bg-accent/50',
         item.priority === 'urgent' && 'border-l-2 border-l-destructive bg-destructive/5'
       )}
+      initial={{ opacity: 0, x: -10 }}
+      transition={{ ...transition, delay: shouldReduceMotion ? 0 : index * 0.03 }}
     >
       <div
         className={cn(
@@ -65,7 +78,7 @@ function NotificationItem({ item }: { item: NotificationHistoryItem }): JSX.Elem
         )}
         <p className="mt-1 text-xs text-muted-foreground">{timeAgo}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -73,6 +86,8 @@ export function NotificationCenter(): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const { history, preferences, unreadCount, isLoading, clearHistory, togglePaused, markAsViewed } =
     useNotifications();
+  const shouldReduceMotion = useReducedMotion();
+  const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
 
   const handleOpenChange = (open: boolean): void => {
     setIsOpen(open);
@@ -152,15 +167,20 @@ export function NotificationCenter(): JSX.Element {
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
+            <motion.div
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-8 text-center"
+              initial={{ opacity: 0 }}
+              transition={transition}
+            >
               <Bell className="mb-2 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">No notifications yet</p>
               <p className="mt-1 text-xs text-muted-foreground/75">You&apos;ll see updates here</p>
-            </div>
+            </motion.div>
           ) : (
             <div className="divide-y">
-              {history.map((item) => (
-                <NotificationItem key={item.id} item={item} />
+              {history.map((item, index) => (
+                <NotificationItem key={item.id} index={index} item={item} />
               ))}
             </div>
           )}

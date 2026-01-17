@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
+import { trackModuleAction } from '@/hooks/useAnalytics';
 import { getFamilyAPI } from '@/shared/utils/electronAPI';
 
 import { useFamilyStore } from '../stores/family.store';
@@ -143,6 +144,8 @@ export function useFamily(): UseFamilyReturn {
         if (currentDevice) {
           setCurrentDeviceId(currentDevice.id);
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        trackModuleAction('family', 'family_created');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create family';
         setError(message);
@@ -192,6 +195,8 @@ export function useFamily(): UseFamilyReturn {
         const result = await familyAPI.join(token.trim());
 
         if (result.success) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          trackModuleAction('family', 'family_joined');
           // Reload family data after joining
           await loadFamily();
           return true;
@@ -218,6 +223,8 @@ export function useFamily(): UseFamilyReturn {
         const familyAPI = getFamilyAPI();
         const newDevices = await familyAPI.removeDevice(deviceId);
         setDevices(newDevices as DeviceInfo[]);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        trackModuleAction('family', 'device_removed');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to remove device';
         setError(message);

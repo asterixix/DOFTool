@@ -5,12 +5,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { motion } from 'framer-motion';
 import { Mail, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useResizablePanel } from '@/hooks/useResizablePanel';
 import { cn } from '@/lib/utils';
 import { EmptyState, LoadingSpinner } from '@/shared/components';
@@ -67,6 +69,8 @@ export function EmailClient(): JSX.Element {
 
   // Check if desktop
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const shouldReduceMotion = useReducedMotion();
+  const pageTransition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
 
   // Both sidebar and message list are resizable
   const sidebarPanel = useResizablePanel({
@@ -414,7 +418,12 @@ export function EmailClient(): JSX.Element {
   );
 
   return (
-    <div className="flex h-full flex-col lg:flex-row">
+    <motion.div
+      animate={{ opacity: 1 }}
+      className="flex h-full flex-col lg:flex-row"
+      initial={{ opacity: 0 }}
+      transition={pageTransition}
+    >
       {/* Mobile Layout */}
       {!isDesktop && (
         <>
@@ -593,6 +602,6 @@ export function EmailClient(): JSX.Element {
           onOpenChange={setFolderManagerOpen}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

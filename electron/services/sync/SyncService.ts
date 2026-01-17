@@ -1,21 +1,13 @@
 /**
- * Sync Service - Main orchestrator for P2P synchronization
+ * Sync Service - Main orchestrator for P2P synchronization using y-webrtc
  *
- * Coordinates mDNS discovery, WebRTC signaling, peer connections,
- * and Yjs document synchronization between family devices.
+ * This service provides a simplified interface for P2P sync using y-webrtc,
+ * which handles peer discovery, signaling, and WebRTC connections automatically.
  */
 
 import { EventEmitter } from 'events';
 
-import { DiscoveryService } from './DiscoveryService';
-import { PeerConnectionService } from './PeerConnectionService';
-import { SignalingService } from './SignalingService';
-import { throttle, debounce } from './SyncPerformance';
-import { YjsSyncProvider } from './YjsSyncProvider';
-
-/** Status update throttling configuration */
-const STATUS_UPDATE_THROTTLE_MS = 100;
-const PEER_COUNT_DEBOUNCE_MS = 200;
+import { WebrtcProvider } from 'y-webrtc';
 
 import type {
   DiscoveredPeer,
@@ -23,9 +15,6 @@ import type {
   SyncStatus,
   SyncConfig,
   AwarenessState,
-  SignalingMessage,
-  RTCSessionDescriptionInit,
-  RTCIceCandidateInit,
 } from './Sync.types';
 import type * as Y from 'yjs';
 
@@ -43,154 +32,274 @@ interface SyncServiceEvents {
   error: (error: Error) => void;
 }
 
+// y-webrtc event types
+type WebrtcStatusEvent = { connected: boolean };
+type WebrtcSyncedEvent = boolean | { synced: boolean }; // Can be boolean or object
+type WebrtcPeersEvent = {
+  added: string[];
+  removed: string[];
+  webrtcPeers: string[];
+  bcPeers: string[];
+};
+
 export class SyncService extends EventEmitter {
   private config: SyncConfig | null = null;
   private ydoc: Y.Doc | null = null;
-
-  // Sub-services
-  private discoveryService: DiscoveryService;
-  private signalingService: SignalingService;
-  private peerConnectionService: PeerConnectionService;
-  private yjsSyncProvider: YjsSyncProvider;
-
-  // State
+  private provider: WebrtcProvider | null = null;
+  private isRunning = false;
+  private isInitializing = false;
+  private peers: Map<string, PeerConnection> = new Map();
   private status: SyncStatus = {
     status: 'offline',
     peerCount: 0,
     lastSyncAt: null,
   };
-  private isRunning = false;
-  private pendingConnections: Set<string> = new Set();
-
-  // Performance: throttled/debounced handlers
-  private throttledEmitStatus: ((status: SyncStatus) => void) & { cancel: () => void };
-  private debouncedUpdatePeerCount: (() => void) & { cancel: () => void; flush: () => void };
 
   constructor() {
     super();
+  }
 
-    this.discoveryService = new DiscoveryService();
-    this.signalingService = new SignalingService();
-    this.peerConnectionService = new PeerConnectionService();
-    this.yjsSyncProvider = new YjsSyncProvider();
+  /**
+   * Set up event handlers to forward events from WebrtcProvider
+   */
+  private setupEventHandlers(provider: WebrtcProvider): void {
+    // Status event - indicates connection to signaling server
+    provider.on('status', (event: WebrtcStatusEvent) => {
+      const connected = event.connected ?? false;
+      if (connected) {
+        this.updateStatus('discovering');
+      } else if (this.isRunning) {
+        this.updateStatus('offline');
+        // Connection lost - emit error
+        const error = new Error('WebRTC connection lost');
+        this.emit('sync-error', error);
+      }
+    });
 
-    // Throttle status emissions to prevent flooding the renderer
-    this.throttledEmitStatus = throttle(
-      (status: SyncStatus) => {
-        this.emit('status-changed', status);
-      },
-      STATUS_UPDATE_THROTTLE_MS,
-      { leading: true, trailing: true }
-    );
+    // Peers event - indicates peer connections
+    provider.on('peers', (event: WebrtcPeersEvent) => {
+      console.log('[SyncService] Peers event:', {
+        added: event.added?.length ?? 0,
+        removed: event.removed?.length ?? 0,
+        webrtcPeers: event.webrtcPeers?.length ?? 0,
+        bcPeers: event.bcPeers?.length ?? 0,
+      });
+      this.handlePeersEvent(event);
+    });
 
-    // Debounce peer count updates (multiple connections can change rapidly)
-    this.debouncedUpdatePeerCount = debounce(
-      () => this.updatePeerCountImmediate(),
-      PEER_COUNT_DEBOUNCE_MS,
-      { leading: false, trailing: true }
-    );
+    // Synced event - indicates document sync state
+    // Note: y-webrtc uses 'synced' event
+    provider.on('synced', (event: WebrtcSyncedEvent) => {
+      // Event might be boolean or object with synced property
+      const isSynced =
+        typeof event === 'boolean' ? event : ((event as { synced?: boolean }).synced ?? false);
+      console.log('[SyncService] Synced event:', isSynced);
 
-    this.setupEventHandlers();
+      if (isSynced) {
+        this.status.lastSyncAt = Date.now();
+        // Only update to syncing if we have peers, otherwise keep current status
+        if (this.peers.size > 0) {
+          this.updateStatus('syncing');
+        }
+        this.emit('sync-completed');
+      } else {
+        this.emit('sync-started');
+      }
+      this.emit('status-changed', { ...this.status });
+    });
+
+    // Awareness changes
+    provider.awareness.on('change', () => {
+      const states = this.getAwarenessStates();
+      this.emit('awareness-update', states);
+    });
+  }
+
+  private updateStatus(status: SyncStatus['status']): void {
+    const previousStatus = this.status.status;
+    this.status.status = status;
+    this.status.peerCount = this.peers.size;
+
+    if (previousStatus !== status) {
+      console.log(
+        `[SyncService] Status changed: ${previousStatus} -> ${status} (peers: ${this.peers.size})`
+      );
+    }
+
+    this.emit('status-changed', { ...this.status });
+  }
+
+  private handlePeersEvent(event: WebrtcPeersEvent): void {
+    const now = Date.now();
+    const webrtcPeerIds = new Set(event.webrtcPeers || []);
+
+    // Handle newly added peers
+    for (const peerId of event.added || []) {
+      if (!this.peers.has(peerId)) {
+        const connection: PeerConnection = {
+          deviceId: peerId,
+          deviceName: peerId.slice(0, 8), // Use first 8 chars as device name
+          status: webrtcPeerIds.has(peerId) ? 'connected' : 'connecting',
+          peerConnection: null,
+          dataChannel: null,
+          lastSeen: now,
+          lastSyncAt: null,
+        };
+        this.peers.set(peerId, connection);
+
+        this.emit('peer-discovered', {
+          deviceId: peerId,
+          deviceName: connection.deviceName,
+          familyIdHash: this.config?.familyId ?? '',
+          host: 'webrtc',
+          port: 0,
+          protocolVersion: '1',
+          discoveredAt: now,
+        });
+
+        if (connection.status === 'connected') {
+          this.emit('peer-connected', connection);
+        }
+      }
+    }
+
+    // Handle removed peers
+    for (const peerId of event.removed || []) {
+      if (this.peers.has(peerId)) {
+        this.peers.delete(peerId);
+        this.emit('peer-disconnected', peerId);
+        this.emit('peer-lost', peerId);
+      }
+    }
+
+    // Update status of existing peers
+    for (const [peerId, connection] of this.peers) {
+      const isConnected = webrtcPeerIds.has(peerId);
+      const nextStatus: PeerConnection['status'] = isConnected ? 'connected' : 'connecting';
+
+      if (connection.status !== nextStatus) {
+        connection.status = nextStatus;
+        connection.lastSeen = now;
+
+        if (nextStatus === 'connected') {
+          connection.lastSyncAt = now;
+          this.emit('peer-connected', connection);
+        }
+      }
+    }
+
+    // Update overall status based on peer count
+    if (this.peers.size > 0) {
+      const connectedCount = Array.from(this.peers.values()).filter(
+        (p) => p.status === 'connected'
+      ).length;
+
+      if (connectedCount > 0) {
+        this.updateStatus('connected');
+      } else {
+        this.updateStatus('connecting');
+      }
+    } else {
+      this.updateStatus(this.isRunning ? 'discovering' : 'offline');
+    }
   }
 
   /**
    * Initialize the sync service
    */
   async initialize(config: SyncConfig, ydoc: Y.Doc): Promise<void> {
-    this.config = config;
-    this.ydoc = ydoc;
+    // Prevent multiple simultaneous initializations
+    if (this.isInitializing) {
+      console.log('[SyncService] Initialization already in progress, skipping...');
+      return;
+    }
 
-    // Initialize signaling service first to get port
-    this.signalingService.initialize({
-      deviceId: config.deviceId,
-      deviceName: config.deviceName,
-    });
+    this.isInitializing = true;
 
-    const signalingPort = await this.signalingService.start();
+    try {
+      // Clean up existing provider if reinitializing
+      if (this.provider) {
+        console.log('[SyncService] Destroying existing provider...');
+        try {
+          // Stop the provider first
+          if (this.isRunning) {
+            this.provider.disconnect();
+            this.isRunning = false;
+          }
+          // Destroy the provider (this should clean up the room)
+          this.provider.destroy();
+        } catch (error) {
+          console.error('[SyncService] Error destroying provider:', error);
+        }
+        this.provider = null;
+        // Give a small delay to ensure cleanup completes
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
 
-    // Initialize discovery service with signaling port
-    this.discoveryService.initialize({
-      ...config,
-      signalingPort,
-    });
+      this.config = config;
+      this.ydoc = ydoc;
 
-    // Initialize peer connection service
-    this.peerConnectionService.initialize({
-      deviceId: config.deviceId,
-      deviceName: config.deviceName,
-    });
+      // Create WebrtcProvider with room name (familyId) and password
+      // The provider will automatically connect to signaling servers
+      // y-webrtc uses a default signaling server, but we can configure custom ones if needed
+      // Note: y-webrtc maintains a global room registry, so we need to handle "already exists" errors
+      let provider: WebrtcProvider;
+      try {
+        provider = new WebrtcProvider(config.familyId, ydoc, {
+          password: config.familyId,
+          // Use default signaling servers from y-webrtc
+          // If you need custom signaling, uncomment and configure:
+          // signaling: ['wss://signaling.yjs.dev'],
+          // Configure STUN servers for NAT traversal (helpful for local network)
+          peerOpts: {
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+              ],
+            },
+          },
+        });
+      } catch (error) {
+        // If room already exists, wait a bit and retry (the previous provider should be cleaned up)
+        if (error instanceof Error && error.message.includes('already exists')) {
+          console.log('[SyncService] Room already exists, waiting for cleanup and retrying...');
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          provider = new WebrtcProvider(config.familyId, ydoc, {
+            password: config.familyId,
+            peerOpts: {
+              config: {
+                iceServers: [
+                  { urls: 'stun:stun.l.google.com:19302' },
+                  { urls: 'stun:stun1.l.google.com:19302' },
+                ],
+              },
+            },
+          });
+        } else {
+          throw error;
+        }
+      }
 
-    // Initialize Yjs sync provider
-    this.yjsSyncProvider.initialize(
-      {
-        deviceId: config.deviceId,
-        deviceName: config.deviceName,
-        encryptionKey: config.encryptionKey,
-      },
-      ydoc
-    );
+      // Set up event handlers before connecting
+      this.setupEventHandlers(provider);
 
-    console.error('[SyncService] Initialized with signaling port', signalingPort);
-  }
+      // Disconnect initially - we'll connect when start() is called
+      provider.disconnect();
+      this.provider = provider;
 
-  /**
-   * Set up event handlers for sub-services
-   */
-  private setupEventHandlers(): void {
-    // Discovery events
-    this.discoveryService.on('peer-discovered', (peer) => {
-      this.handlePeerDiscovered(peer);
-    });
-
-    this.discoveryService.on('peer-lost', (deviceId) => {
-      this.handlePeerLost(deviceId);
-    });
-
-    this.discoveryService.on('error', (error) => {
-      console.error('[SyncService] Discovery error:', error);
-      this.emit('error', error);
-    });
-
-    // Signaling events
-    this.signalingService.on('message-received', (message, respond) => {
-      void this.handleSignalingMessage(message, respond);
-    });
-
-    // Peer connection events
-    this.peerConnectionService.on('connection-state-changed', (deviceId, status) => {
-      this.handleConnectionStateChanged(deviceId, status);
-    });
-
-    this.peerConnectionService.on('channel-open', (deviceId, channel) => {
-      this.handleChannelOpen(deviceId, channel);
-    });
-
-    this.peerConnectionService.on('channel-closed', (deviceId) => {
-      this.handleChannelClosed(deviceId);
-    });
-
-    this.peerConnectionService.on('ice-candidate', (deviceId, candidate) => {
-      void this.handleIceCandidate(deviceId, candidate);
-    });
-
-    this.peerConnectionService.on('authenticated', (deviceId) => {
-      this.handlePeerAuthenticated(deviceId);
-    });
-
-    // Yjs sync events
-    this.yjsSyncProvider.on('sync-started', (deviceId) => {
-      console.error(`[SyncService] Sync started with ${deviceId}`);
-    });
-
-    this.yjsSyncProvider.on('sync-completed', (deviceId) => {
-      console.error(`[SyncService] Sync completed with ${deviceId}`);
-      this.updateStatus({ lastSyncAt: Date.now() });
-      this.emit('sync-completed');
-    });
-
-    this.yjsSyncProvider.on('awareness-update', (states) => {
-      this.emit('awareness-update', states);
-    });
+      this.updateStatus('offline');
+      console.log('[SyncService] Initialized with y-webrtc backend');
+      console.log('[SyncService] Room name (familyId):', config.familyId);
+      console.log('[SyncService] Device ID:', config.deviceId);
+      console.log('[SyncService] Device name:', config.deviceName);
+    } catch (error) {
+      console.error('[SyncService] Error during initialization:', error);
+      this.isInitializing = false;
+      throw error;
+    } finally {
+      this.isInitializing = false;
+    }
   }
 
   /**
@@ -198,21 +307,30 @@ export class SyncService extends EventEmitter {
    */
   start(): void {
     if (this.isRunning) {
+      console.log('[SyncService] Already running');
       return;
     }
 
-    if (!this.config || !this.ydoc) {
+    if (!this.config || !this.ydoc || !this.provider) {
       console.error('[SyncService] Cannot start: not initialized');
       throw new Error('SyncService not initialized');
     }
 
     this.isRunning = true;
-    this.updateStatus({ status: 'discovering' });
 
-    // Start discovery
-    this.discoveryService.start();
+    // Connect to signaling server and start peer discovery
+    console.log('[SyncService] Connecting to signaling server...');
+    this.provider.connect();
+    this.updateStatus('discovering');
 
-    console.error('[SyncService] Started');
+    // Update awareness with device info
+    this.setAwarenessState({
+      deviceId: this.config.deviceId,
+      deviceName: this.config.deviceName,
+    });
+
+    console.log('[SyncService] Started - connecting to peers...');
+    console.log('[SyncService] Provider connected:', this.provider.connected);
   }
 
   /**
@@ -224,317 +342,84 @@ export class SyncService extends EventEmitter {
     }
 
     this.isRunning = false;
+    this.provider?.disconnect();
+    this.updateStatus('offline');
 
-    // Stop all services
-    this.discoveryService.stop();
-    this.peerConnectionService.closeAllConnections();
-    this.signalingService.stop();
-
-    this.pendingConnections.clear();
-    this.updateStatus({ status: 'offline', peerCount: 0 });
-
-    console.error('[SyncService] Stopped');
-  }
-
-  /**
-   * Handle discovered peer
-   */
-  private handlePeerDiscovered(peer: DiscoveredPeer): void {
-    console.error(`[SyncService] Peer discovered: ${peer.deviceName}`);
-    this.emit('peer-discovered', peer);
-
-    // Initiate connection if not already connecting
-    if (!this.pendingConnections.has(peer.deviceId)) {
-      void this.initiateConnection(peer);
-    }
-  }
-
-  /**
-   * Handle peer going offline
-   */
-  private handlePeerLost(deviceId: string): void {
-    console.error(`[SyncService] Peer lost: ${deviceId}`);
-
-    this.pendingConnections.delete(deviceId);
-    this.peerConnectionService.closeConnection(deviceId);
-    this.yjsSyncProvider.removePeer(deviceId);
-    this.emit('peer-lost', deviceId);
-
-    this.updatePeerCount();
-  }
-
-  /**
-   * Initiate connection to a discovered peer
-   */
-  private async initiateConnection(peer: DiscoveredPeer): Promise<void> {
-    if (!this.config) {
-      return;
-    }
-
-    // Use device ID comparison to determine who initiates
-    // Higher ID initiates to prevent both sides trying simultaneously
-    if (this.config.deviceId < peer.deviceId) {
-      console.error(`[SyncService] Waiting for ${peer.deviceName} to initiate`);
-      return;
-    }
-
-    this.pendingConnections.add(peer.deviceId);
-    console.error(`[SyncService] Initiating connection to ${peer.deviceName}`);
-
-    try {
-      // Connect to peer's signaling server
-      await this.signalingService.connectTo(peer.host, peer.port, peer.deviceId);
-
-      // Create WebRTC offer
-      const { offer } = await this.peerConnectionService.createConnection(peer);
-
-      // Send offer via signaling
-      const offerMessage = this.signalingService.createOfferMessage(
-        peer.deviceId,
-        offer,
-        '' // TODO: Add signature
-      );
-      this.signalingService.sendTo(peer.deviceId, offerMessage);
-    } catch (error) {
-      console.error(`[SyncService] Failed to initiate connection to ${peer.deviceName}:`, error);
-      this.pendingConnections.delete(peer.deviceId);
-    }
-  }
-
-  /**
-   * Handle incoming signaling message
-   */
-  private async handleSignalingMessage(
-    message: SignalingMessage,
-    respond: (msg: SignalingMessage) => void
-  ): Promise<void> {
-    if (!this.config) {
-      return;
-    }
-
-    // Ignore messages not for us
-    if (message.to !== this.config.deviceId) {
-      return;
-    }
-
-    const peer = this.discoveryService.getPeer(message.from);
-
-    try {
-      switch (message.type) {
-        case 'offer':
-          await this.handleOffer(message, peer, respond);
-          break;
-
-        case 'answer':
-          await this.handleAnswer(message);
-          break;
-
-        case 'ice-candidate':
-          await this.handleRemoteIceCandidate(message);
-          break;
-      }
-    } catch (error) {
-      console.error('[SyncService] Error handling signaling message:', error);
-    }
-  }
-
-  /**
-   * Handle incoming offer
-   */
-  private async handleOffer(
-    message: SignalingMessage,
-    peer: DiscoveredPeer | undefined,
-    respond: (msg: SignalingMessage) => void
-  ): Promise<void> {
-    if (!peer) {
-      console.error('[SyncService] Received offer from unknown peer:', message.from);
-      return;
-    }
-
-    console.error(`[SyncService] Received offer from ${peer.deviceName}`);
-
-    this.pendingConnections.add(peer.deviceId);
-
-    // Accept connection and create answer
-    const answer = await this.peerConnectionService.acceptConnection(
-      peer,
-      message.payload as RTCSessionDescriptionInit
-    );
-
-    // Send answer
-    const answerMessage = this.signalingService.createAnswerMessage(
-      peer.deviceId,
-      answer,
-      '' // TODO: Add signature
-    );
-    respond(answerMessage);
-  }
-
-  /**
-   * Handle incoming answer
-   */
-  private async handleAnswer(message: SignalingMessage): Promise<void> {
-    console.error(`[SyncService] Received answer from ${message.from}`);
-    await this.peerConnectionService.handleAnswer(
-      message.from,
-      message.payload as RTCSessionDescriptionInit
-    );
-  }
-
-  /**
-   * Handle incoming ICE candidate
-   */
-  private async handleRemoteIceCandidate(message: SignalingMessage): Promise<void> {
-    await this.peerConnectionService.addIceCandidate(
-      message.from,
-      message.payload as RTCIceCandidateInit
-    );
-  }
-
-  /**
-   * Handle local ICE candidate to send to peer
-   */
-  private handleIceCandidate(deviceId: string, candidate: RTCIceCandidateInit): void {
-    if (!this.signalingService.isConnectedTo(deviceId)) {
-      return;
-    }
-
-    const message = this.signalingService.createIceCandidateMessage(
-      deviceId,
-      candidate,
-      '' // TODO: Add signature
-    );
-
-    try {
-      this.signalingService.sendTo(deviceId, message);
-    } catch (error) {
-      console.error('[SyncService] Failed to send ICE candidate:', error);
-    }
-  }
-
-  /**
-   * Handle connection state change
-   */
-  private handleConnectionStateChanged(deviceId: string, status: string): void {
-    console.error(`[SyncService] Connection state for ${deviceId}: ${status}`);
-
-    if (status === 'connected') {
-      this.updateStatus({ status: 'connected' });
-    } else if (status === 'disconnected') {
-      this.pendingConnections.delete(deviceId);
-      this.yjsSyncProvider.removePeer(deviceId);
-      this.emit('peer-disconnected', deviceId);
-      this.updatePeerCount();
-    }
-  }
-
-  /**
-   * Handle data channel opening
-   */
-  private handleChannelOpen(deviceId: string, _channel: unknown): void {
-    console.error(`[SyncService] Channel open with ${deviceId}`);
-    // Channel is ready, authentication will happen next
-  }
-
-  /**
-   * Handle data channel closing
-   */
-  private handleChannelClosed(deviceId: string): void {
-    console.error(`[SyncService] Channel closed with ${deviceId}`);
-    this.yjsSyncProvider.removePeer(deviceId);
-    this.emit('peer-disconnected', deviceId);
-    this.updatePeerCount();
-  }
-
-  /**
-   * Handle peer authentication success
-   */
-  private handlePeerAuthenticated(deviceId: string): void {
-    console.error(`[SyncService] Peer authenticated: ${deviceId}`);
-
-    this.pendingConnections.delete(deviceId);
-
-    // Get the connection and add to sync provider
-    const connection = this.peerConnectionService.getConnection(deviceId);
-    if (connection?.dataChannel) {
-      this.yjsSyncProvider.addPeer(deviceId, connection.dataChannel);
-      this.emit('peer-connected', connection);
-      this.emit('sync-started');
-    }
-
-    this.updatePeerCount();
-  }
-
-  /**
-   * Update sync status with throttled emission
-   */
-  private updateStatus(update: Partial<SyncStatus>): void {
-    this.status = { ...this.status, ...update };
-    // Use throttled emit to prevent flooding renderer with updates
-    this.throttledEmitStatus(this.status);
-  }
-
-  /**
-   * Update peer count based on connected peers (debounced)
-   */
-  private updatePeerCount(): void {
-    this.debouncedUpdatePeerCount();
-  }
-
-  /**
-   * Immediate peer count update (called by debounced function)
-   */
-  private updatePeerCountImmediate(): void {
-    const connectedCount = this.peerConnectionService.getConnectedDeviceIds().length;
-    this.updateStatus({
-      peerCount: connectedCount,
-      status: connectedCount > 0 ? 'connected' : this.isRunning ? 'discovering' : 'offline',
-    });
+    console.log('[SyncService] Stopped');
   }
 
   /**
    * Get current sync status
    */
   getStatus(): SyncStatus {
-    return { ...this.status };
+    return { ...this.status, peerCount: this.peers.size };
   }
 
   /**
    * Get list of connected peers
    */
   getConnectedPeers(): PeerConnection[] {
-    return this.peerConnectionService
-      .getAllConnections()
-      .filter((conn) => conn.status === 'connected');
+    return Array.from(this.peers.values());
   }
 
   /**
-   * Get discovered peers
+   * Get discovered peers (in y-webrtc, peers are connected via signaling)
    */
   getDiscoveredPeers(): DiscoveredPeer[] {
-    return this.discoveryService.getDiscoveredPeers();
+    return Array.from(this.peers.values()).map((peer) => ({
+      deviceId: peer.deviceId,
+      deviceName: peer.deviceName,
+      familyIdHash: this.config?.familyId ?? '',
+      host: 'webrtc',
+      port: 0,
+      protocolVersion: '1',
+      discoveredAt: peer.lastSeen,
+    }));
   }
 
   /**
    * Force sync with all peers
    */
   forceSync(): void {
-    this.yjsSyncProvider.forceSync();
+    if (!this.provider) {
+      return;
+    }
     this.emit('sync-started');
+    this.provider.disconnect();
+    this.provider.connect();
   }
 
   /**
    * Update awareness state
    */
   setAwarenessState(state: Partial<AwarenessState>): void {
-    this.yjsSyncProvider.setAwarenessState(state);
+    if (!this.provider || !this.config) {
+      return;
+    }
+
+    const currentState = this.provider.awareness.getLocalState() as AwarenessState | null;
+    this.provider.awareness.setLocalState({
+      ...currentState,
+      ...state,
+      deviceId: this.config.deviceId,
+      deviceName: this.config.deviceName,
+      lastSeen: Date.now(),
+    });
   }
 
   /**
    * Get awareness states
    */
   getAwarenessStates(): Map<number, AwarenessState> {
-    return this.yjsSyncProvider.getAwarenessStates();
+    if (!this.provider) {
+      return new Map();
+    }
+
+    const states = new Map<number, AwarenessState>();
+    this.provider.awareness.getStates().forEach((state, clientId) => {
+      states.set(clientId, state as AwarenessState);
+    });
+    return states;
   }
 
   /**
@@ -545,20 +430,22 @@ export class SyncService extends EventEmitter {
   }
 
   /**
+   * Check if service is initialized
+   */
+  isInitialized(): boolean {
+    return this.config !== null && this.ydoc !== null && this.provider !== null;
+  }
+
+  /**
    * Destroy the service
    */
   destroy(): void {
-    // Cancel throttled/debounced handlers
-    this.throttledEmitStatus.cancel();
-    this.debouncedUpdatePeerCount.cancel();
-
     this.stop();
-
-    this.yjsSyncProvider.destroy();
-    this.peerConnectionService.destroy();
-    this.signalingService.destroy();
-    this.discoveryService.destroy();
-
+    if (this.provider) {
+      this.provider.destroy();
+      this.provider = null;
+    }
+    this.peers.clear();
     this.removeAllListeners();
     this.config = null;
     this.ydoc = null;

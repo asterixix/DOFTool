@@ -1,14 +1,16 @@
 /**
- * Sync Module - P2P synchronization services
+ * Sync Module - P2P synchronization services using y-webrtc
  *
  * Exports all sync-related services and types for use in the main process.
  */
 
+export { SyncService } from './SyncService';
+
+// Legacy exports for backward compatibility (may be removed in future)
 export { DiscoveryService } from './DiscoveryService';
 export { SignalingService } from './SignalingService';
 export { PeerConnectionService, type WebRTCFactory } from './PeerConnectionService';
 export { YjsSyncProvider } from './YjsSyncProvider';
-export { SyncService } from './SyncService';
 
 // Performance utilities
 export {

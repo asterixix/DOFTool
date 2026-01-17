@@ -1,6 +1,6 @@
-# FamilySync P2P Sync Protocol
+# DOFTool P2P Sync Protocol
 
-This document specifies the peer-to-peer synchronization protocol for FamilySync, including device discovery, connection establishment, and CRDT-based data synchronization.
+This document specifies the peer-to-peer synchronization protocol for DOFTool, including device discovery, connection establishment, and CRDT-based data synchronization.
 
 ---
 
@@ -63,13 +63,13 @@ FamilySync uses a fully decentralized P2P architecture:
 
 ### Key Characteristics
 
-| Aspect | Implementation |
-|--------|----------------|
-| **Discovery** | mDNS on local network |
-| **Transport** | WebRTC Data Channels |
+| Aspect         | Implementation              |
+| -------------- | --------------------------- |
+| **Discovery**  | mDNS on local network       |
+| **Transport**  | WebRTC Data Channels        |
 | **Encryption** | DTLS 1.3 + Application E2EE |
-| **Data Sync** | Yjs CRDTs |
-| **Topology** | Full mesh (small families) |
+| **Data Sync**  | Yjs CRDTs                   |
+| **Topology**   | Full mesh (small families)  |
 
 ---
 
@@ -84,7 +84,7 @@ Each FamilySync device advertises itself via mDNS:
 const SERVICE_CONFIG = {
   name: `FamilySync-${deviceId.slice(0, 8)}`,
   type: '_familysync._tcp',
-  port: 0,  // Dynamic port assignment
+  port: 0, // Dynamic port assignment
   txt: {
     // Family ID hash (not full ID for privacy)
     fid: blake2b(familyId).slice(0, 16).toString('hex'),
@@ -96,7 +96,7 @@ const SERVICE_CONFIG = {
     pv: '1',
     // App version
     av: appVersion,
-  }
+  },
 };
 ```
 
@@ -148,7 +148,7 @@ class DiscoveryService {
   private advertisement: Service | null = null;
   private browser: Browser | null = null;
   private familyIdHash: string;
-  
+
   constructor(
     private deviceId: string,
     private devicePublicKey: Uint8Array,
@@ -158,12 +158,12 @@ class DiscoveryService {
     this.bonjour = new Bonjour();
     this.familyIdHash = this.hashFamilyId(familyId);
   }
-  
+
   private hashFamilyId(familyId: string): string {
     const hash = sodium.crypto_generichash(16, familyId);
     return sodium.to_hex(hash);
   }
-  
+
   async startAdvertising(port: number): Promise<void> {
     this.advertisement = this.bonjour.publish({
       name: `FamilySync-${this.deviceId.slice(0, 8)}`,
@@ -174,13 +174,13 @@ class DiscoveryService {
         did: this.deviceId,
         pk: sodium.to_base64(this.devicePublicKey),
         pv: '1',
-      }
+      },
     });
   }
-  
+
   async startBrowsing(): Promise<void> {
     this.browser = this.bonjour.find({ type: 'familysync' });
-    
+
     this.browser.on('up', (service) => {
       // Check if same family
       if (service.txt?.fid === this.familyIdHash) {
@@ -196,13 +196,13 @@ class DiscoveryService {
         }
       }
     });
-    
+
     this.browser.on('down', (service) => {
       // Handle peer going offline
       this.onPeerOffline(service.txt?.did);
     });
   }
-  
+
   async stop(): Promise<void> {
     this.advertisement?.stop();
     this.browser?.stop();
@@ -285,13 +285,13 @@ interface SignalingMessage {
 class SignalingService {
   private server: Server;
   private connections: Map<string, Socket> = new Map();
-  
+
   async start(): Promise<number> {
     return new Promise((resolve) => {
       this.server = createServer((socket) => {
         this.handleConnection(socket);
       });
-      
+
       // Dynamic port assignment
       this.server.listen(0, () => {
         const address = this.server.address() as AddressInfo;
@@ -299,17 +299,17 @@ class SignalingService {
       });
     });
   }
-  
+
   private handleConnection(socket: Socket): void {
     let buffer = '';
-    
+
     socket.on('data', (data) => {
       buffer += data.toString();
-      
+
       // Parse newline-delimited JSON
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-      
+
       for (const line of lines) {
         if (line.trim()) {
           const message = JSON.parse(line) as SignalingMessage;
@@ -318,22 +318,19 @@ class SignalingService {
       }
     });
   }
-  
-  private async handleMessage(
-    message: SignalingMessage,
-    socket: Socket
-  ): Promise<void> {
+
+  private async handleMessage(message: SignalingMessage, socket: Socket): Promise<void> {
     // Verify signature
     const valid = await this.verifySignature(message);
     if (!valid) {
       socket.write(JSON.stringify({ error: 'Invalid signature' }) + '\n');
       return;
     }
-    
+
     // Emit for WebRTC handling
     this.emit('signaling-message', message, socket);
   }
-  
+
   async sendTo(deviceId: string, message: SignalingMessage): Promise<void> {
     const socket = this.connections.get(deviceId);
     if (socket) {
@@ -351,19 +348,19 @@ class SignalingService {
 class PeerConnectionManager {
   private connections: Map<string, RTCPeerConnection> = new Map();
   private dataChannels: Map<string, RTCDataChannel> = new Map();
-  
+
   async connectToPeer(peer: DiscoveredPeer): Promise<RTCDataChannel> {
     // Create peer connection
     const pc = new RTCPeerConnection({
       iceServers: [], // No TURN servers needed for local network
     });
-    
+
     // Create data channel
     const channel = pc.createDataChannel('familysync', {
       ordered: true,
       maxRetransmits: 10,
     });
-    
+
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -376,11 +373,11 @@ class PeerConnectionManager {
         });
       }
     };
-    
+
     // Create and send offer
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    
+
     await this.signaling.sendTo(peer.deviceId, {
       type: 'offer',
       from: this.deviceId,
@@ -388,7 +385,7 @@ class PeerConnectionManager {
       payload: offer,
       signature: this.sign(offer),
     });
-    
+
     // Wait for channel to open
     return new Promise((resolve, reject) => {
       channel.onopen = () => {
@@ -399,11 +396,8 @@ class PeerConnectionManager {
       channel.onerror = reject;
     });
   }
-  
-  private async authenticatePeer(
-    channel: RTCDataChannel,
-    peer: DiscoveredPeer
-  ): Promise<void> {
+
+  private async authenticatePeer(channel: RTCDataChannel, peer: DiscoveredPeer): Promise<void> {
     // Send authentication request
     const timestamp = Date.now();
     const message = `${this.deviceId}:${timestamp}`;
@@ -411,22 +405,24 @@ class PeerConnectionManager {
       new TextEncoder().encode(message),
       this.signingKey
     );
-    
-    channel.send(JSON.stringify({
-      type: 'AUTH_REQUEST',
-      deviceId: this.deviceId,
-      timestamp,
-      signature: sodium.to_base64(signature),
-    }));
-    
+
+    channel.send(
+      JSON.stringify({
+        type: 'AUTH_REQUEST',
+        deviceId: this.deviceId,
+        timestamp,
+        signature: sodium.to_base64(signature),
+      })
+    );
+
     // Wait for response and verify
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Auth timeout')), 10000);
-      
+
       channel.onmessage = (event) => {
         clearTimeout(timeout);
         const response = JSON.parse(event.data);
-        
+
         if (response.type === 'AUTH_RESPONSE') {
           const valid = this.verifyPeerAuth(response, peer.publicKey);
           if (valid) {
@@ -457,17 +453,17 @@ class YjsSyncManager {
   private ydoc: Y.Doc;
   private persistence: LeveldbPersistence;
   private peers: Map<string, RTCDataChannel> = new Map();
-  
+
   constructor(
     private familyId: string,
     private encryptionKey: Uint8Array
   ) {
     this.ydoc = new Y.Doc();
     this.persistence = new LeveldbPersistence('./data/yjs');
-    
+
     // Bind persistence
     this.persistence.bindState(familyId, this.ydoc);
-    
+
     // Listen for local changes
     this.ydoc.on('update', (update, origin) => {
       if (origin !== 'remote') {
@@ -475,109 +471,99 @@ class YjsSyncManager {
       }
     });
   }
-  
+
   addPeer(deviceId: string, channel: RTCDataChannel): void {
     this.peers.set(deviceId, channel);
-    
+
     channel.onmessage = (event) => {
       this.handlePeerMessage(deviceId, event.data);
     };
-    
+
     // Send current state vector
     this.sendSyncStep1(channel);
   }
-  
+
   private async sendSyncStep1(channel: RTCDataChannel): Promise<void> {
     // Step 1: Send state vector
     const stateVector = Y.encodeStateVector(this.ydoc);
     const encrypted = await this.encrypt(stateVector);
-    
-    channel.send(JSON.stringify({
-      type: 'SYNC_STEP_1',
-      payload: sodium.to_base64(encrypted),
-    }));
+
+    channel.send(
+      JSON.stringify({
+        type: 'SYNC_STEP_1',
+        payload: sodium.to_base64(encrypted),
+      })
+    );
   }
-  
-  private async handlePeerMessage(
-    deviceId: string,
-    data: string
-  ): Promise<void> {
+
+  private async handlePeerMessage(deviceId: string, data: string): Promise<void> {
     const message = JSON.parse(data);
     const payload = await this.decrypt(sodium.from_base64(message.payload));
-    
+
     switch (message.type) {
       case 'SYNC_STEP_1':
         // Received state vector, send missing updates
         const remoteStateVector = payload;
-        const missingUpdates = Y.encodeStateAsUpdate(
-          this.ydoc,
-          remoteStateVector
-        );
-        
+        const missingUpdates = Y.encodeStateAsUpdate(this.ydoc, remoteStateVector);
+
         const encrypted = await this.encrypt(missingUpdates);
         const channel = this.peers.get(deviceId);
-        channel?.send(JSON.stringify({
-          type: 'SYNC_STEP_2',
-          payload: sodium.to_base64(encrypted),
-        }));
+        channel?.send(
+          JSON.stringify({
+            type: 'SYNC_STEP_2',
+            payload: sodium.to_base64(encrypted),
+          })
+        );
         break;
-        
+
       case 'SYNC_STEP_2':
         // Received missing updates, apply them
         Y.applyUpdate(this.ydoc, payload, 'remote');
         break;
-        
+
       case 'UPDATE':
         // Incremental update
         Y.applyUpdate(this.ydoc, payload, 'remote');
         break;
     }
   }
-  
+
   private async broadcastUpdate(update: Uint8Array): Promise<void> {
     const encrypted = await this.encrypt(update);
     const message = JSON.stringify({
       type: 'UPDATE',
       payload: sodium.to_base64(encrypted),
     });
-    
+
     for (const channel of this.peers.values()) {
       if (channel.readyState === 'open') {
         channel.send(message);
       }
     }
   }
-  
+
   private async encrypt(data: Uint8Array): Promise<Uint8Array> {
     const nonce = sodium.randombytes_buf(24);
-    const ciphertext = sodium.crypto_secretbox_easy(
-      data,
-      nonce,
-      this.encryptionKey
-    );
+    const ciphertext = sodium.crypto_secretbox_easy(data, nonce, this.encryptionKey);
     return new Uint8Array([...nonce, ...ciphertext]);
   }
-  
+
   private async decrypt(data: Uint8Array): Promise<Uint8Array> {
     const nonce = data.slice(0, 24);
     const ciphertext = data.slice(24);
-    return sodium.crypto_secretbox_open_easy(
-      ciphertext,
-      nonce,
-      this.encryptionKey
-    );
+    return sodium.crypto_secretbox_open_easy(ciphertext, nonce, this.encryptionKey);
   }
 }
 ```
 
 ### Sync Protocol Messages
 
-| Message Type | Direction | Description |
-|--------------|-----------|-------------|
+| Message Type  | Direction             | Description                |
+| ------------- | --------------------- | -------------------------- |
 | `SYNC_STEP_1` | Initiator → Responder | State vector (what I have) |
-| `SYNC_STEP_2` | Responder → Initiator | Missing updates |
-| `UPDATE` | Bidirectional | Incremental CRDT update |
-| `AWARENESS` | Bidirectional | Presence information |
+| `SYNC_STEP_2` | Responder → Initiator | Missing updates            |
+| `UPDATE`      | Bidirectional         | Incremental CRDT update    |
+| `AWARENESS`   | Bidirectional         | Presence information       |
 
 ### Sync Flow
 
@@ -637,61 +623,61 @@ interface AwarenessState {
   userId: string;
   userName: string;
   userColor: string;
-  
+
   // Device info
   deviceId: string;
   deviceName: string;
-  
+
   // Current state
   currentView: 'calendar' | 'tasks' | 'email' | 'settings';
   currentItemId?: string; // e.g., event being edited
-  
+
   // Cursor position (for collaborative editing)
   cursor?: {
     itemId: string;
     position: number;
   };
-  
+
   // Online status
   lastSeen: number;
 }
 
 class AwarenessManager {
   private awareness: Awareness;
-  
+
   constructor(ydoc: Y.Doc) {
     this.awareness = new Awareness(ydoc);
-    
+
     // Update local state
     this.awareness.setLocalStateField('user', {
       userId: currentUser.id,
       userName: currentUser.displayName,
       userColor: currentUser.color,
     });
-    
+
     // Listen for remote state changes
     this.awareness.on('change', (changes) => {
       this.handleAwarenessChange(changes);
     });
   }
-  
+
   setCurrentView(view: string, itemId?: string): void {
     this.awareness.setLocalStateField('currentView', view);
     this.awareness.setLocalStateField('currentItemId', itemId);
   }
-  
+
   setCursor(itemId: string, position: number): void {
     this.awareness.setLocalStateField('cursor', { itemId, position });
   }
-  
+
   getOnlineUsers(): AwarenessState[] {
-    return Array.from(this.awareness.getStates().values())
-      .filter(state => Date.now() - state.lastSeen < 30000);
+    return Array.from(this.awareness.getStates().values()).filter(
+      (state) => Date.now() - state.lastSeen < 30000
+    );
   }
-  
+
   getUsersEditingItem(itemId: string): AwarenessState[] {
-    return this.getOnlineUsers()
-      .filter(state => state.currentItemId === itemId);
+    return this.getOnlineUsers().filter((state) => state.currentItemId === itemId);
   }
 }
 ```
@@ -733,13 +719,13 @@ class AwarenessManager {
 
 Yjs CRDTs provide **automatic conflict resolution**:
 
-| Conflict Type | Resolution Strategy |
-|---------------|-------------------|
-| Concurrent inserts | Unique IDs + lamport timestamps |
-| Concurrent deletes | Tombstones preserved |
-| Text editing | Position-based merge (Yjs algorithm) |
-| Map updates | Last-writer-wins per key |
-| Array operations | Order preserved via unique IDs |
+| Conflict Type      | Resolution Strategy                  |
+| ------------------ | ------------------------------------ |
+| Concurrent inserts | Unique IDs + lamport timestamps      |
+| Concurrent deletes | Tombstones preserved                 |
+| Text editing       | Position-based merge (Yjs algorithm) |
+| Map updates        | Last-writer-wins per key             |
+| Array operations   | Order preserved via unique IDs       |
 
 ### Example: Concurrent Event Edits
 
@@ -794,12 +780,11 @@ interface ConflictIndicator {
 // The app can show warnings for detected semantic conflicts
 function detectSchedulingConflicts(events: CalendarEvent[]): ConflictIndicator[] {
   const conflicts: ConflictIndicator[] = [];
-  
+
   // Check for overlapping events with same attendees
   for (let i = 0; i < events.length; i++) {
     for (let j = i + 1; j < events.length; j++) {
-      if (eventsOverlap(events[i], events[j]) && 
-          shareAttendees(events[i], events[j])) {
+      if (eventsOverlap(events[i], events[j]) && shareAttendees(events[i], events[j])) {
         conflicts.push({
           itemId: events[i].id,
           type: 'scheduling',
@@ -811,7 +796,7 @@ function detectSchedulingConflicts(events: CalendarEvent[]): ConflictIndicator[]
       }
     }
   }
-  
+
   return conflicts;
 }
 ```
@@ -837,28 +822,25 @@ class ConnectionErrorHandler {
   private retryAttempts: Map<string, number> = new Map();
   private maxRetries = 5;
   private baseDelay = 1000;
-  
-  async handleError(
-    peerId: string,
-    error: ConnectionError
-  ): Promise<void> {
+
+  async handleError(peerId: string, error: ConnectionError): Promise<void> {
     const attempts = this.retryAttempts.get(peerId) || 0;
-    
+
     if (attempts >= this.maxRetries) {
       this.emit('peer-unreachable', peerId);
       return;
     }
-    
+
     // Exponential backoff
     const delay = this.baseDelay * Math.pow(2, attempts);
     this.retryAttempts.set(peerId, attempts + 1);
-    
-    await new Promise(resolve => setTimeout(resolve, delay));
-    
+
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
     // Retry connection
     this.emit('retry-connection', peerId);
   }
-  
+
   resetAttempts(peerId: string): void {
     this.retryAttempts.delete(peerId);
   }
@@ -869,11 +851,7 @@ class ConnectionErrorHandler {
 
 ```typescript
 // Handle corrupted updates
-async function handleSyncError(
-  error: Error,
-  update: Uint8Array,
-  peerId: string
-): Promise<void> {
+async function handleSyncError(error: Error, update: Uint8Array, peerId: string): Promise<void> {
   if (error.message.includes('Invalid update')) {
     // Request full state sync from peer
     requestFullSync(peerId);
@@ -951,7 +929,7 @@ function selectTopology(deviceCount: number): 'mesh' | 'star' {
   if (deviceCount <= 6) {
     return 'mesh';
   }
-  
+
   // Star for larger families (admin as hub)
   return 'star';
 }
@@ -976,17 +954,17 @@ function checkCompatibility(
   if (localVersion === remoteVersion) {
     return 'compatible';
   }
-  
+
   // Backward compatible within major version
   if (Math.floor(localVersion) === Math.floor(remoteVersion)) {
     return 'compatible';
   }
-  
+
   // Major version mismatch
   if (localVersion < remoteVersion) {
     return 'upgrade-needed';
   }
-  
+
   return 'incompatible';
 }
 ```

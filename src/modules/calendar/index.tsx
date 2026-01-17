@@ -4,13 +4,16 @@
 
 import { useState } from 'react';
 
+import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 import { Routes, Route } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { trackModuleAction } from '@/hooks/useAnalytics';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useFamily } from '@/modules/family/hooks/useFamily';
 import { useFamilyStore } from '@/modules/family/stores/family.store';
 import { ErrorBanner } from '@/shared/components';
@@ -22,6 +25,7 @@ import {
   DayEventsDialog,
   DayView,
   EventEditor,
+  EventPreview,
   ExternalCalendarSubscription,
   ICalImportExport,
   MonthView,
@@ -29,6 +33,7 @@ import {
   WeekView,
 } from './components';
 import { useCalendar } from './hooks/useCalendar';
+import { useRegionalSettings } from './hooks/useRegionalSettings';
 import { useCalendarStore } from './stores';
 
 import type { EventFormData } from './components/EventEditor';
@@ -39,9 +44,15 @@ function CalendarPage(): JSX.Element {
   const [dayEventsDialogOpen, setDayEventsDialogOpen] = useState(false);
   const [dayEventsDialogDate, setDayEventsDialogDate] = useState<number | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [previewEvent, setPreviewEvent] = useState<ExpandedEvent | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Check if we're on desktop
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const shouldReduceMotion = useReducedMotion();
+
+  // Get regional settings for calendar formatting
+  const { weekStartDay } = useRegionalSettings();
 
   // Get family data for sharing
   const { devices, currentDevice } = useFamily();
@@ -115,11 +126,33 @@ function CalendarPage(): JSX.Element {
   const currentUserId = currentDevice?.id ?? '';
 
   const handleEventClick = (event: ExpandedEvent): void => {
+    // Clear selected date when clicking event (removes day focus in month view)
+    setSelectedDate(null);
+    // Open preview dialog instead of directly editing
+    setPreviewEvent(event);
+    setIsPreviewOpen(true);
+  };
+
+  const handlePreviewEdit = (): void => {
+    if (!previewEvent) {
+      return;
+    }
+    // Close preview and open editor
+    setIsPreviewOpen(false);
     // Get the master event for editing (not the instance)
-    const masterEvent = event.masterEventId
-      ? getCalendarById(event.calendarId) // This needs fixing - should get event
-      : event;
+    const masterEvent = previewEvent.masterEventId
+      ? getCalendarById(previewEvent.calendarId) // This needs fixing - should get event
+      : previewEvent;
     openEventEditor(masterEvent as unknown as Parameters<typeof openEventEditor>[0], null);
+  };
+
+  const handlePreviewDelete = async (): Promise<void> => {
+    if (!previewEvent) {
+      return;
+    }
+    await deleteEvent(previewEvent.id);
+    setIsPreviewOpen(false);
+    setPreviewEvent(null);
   };
 
   const handleCreateCalendar = async (name: string, color: CalendarColor): Promise<void> => {
@@ -128,10 +161,16 @@ function CalendarPage(): JSX.Element {
       color,
       visibility: 'family',
     });
+    trackModuleAction('calendar', 'calendar_created', { color, visibility: 'family' });
   };
 
   const handleSaveEvent = async (data: EventFormData): Promise<void> => {
     if (data.id) {
+      trackModuleAction('calendar', 'event_updated', {
+        hasRecurrence: !!data.recurrence,
+        allDay: data.allDay,
+        hasReminders: (data.reminders?.length ?? 0) > 0,
+      });
       await updateEvent({
         id: data.id,
         updateScope: undefined,
@@ -141,7 +180,7 @@ function CalendarPage(): JSX.Element {
         start: data.start,
         end: data.end,
         allDay: data.allDay,
-        timezone: undefined,
+        timezone: data.timezone,
         recurrence: data.recurrence,
         category: data.category,
         color: data.color,
@@ -149,6 +188,11 @@ function CalendarPage(): JSX.Element {
         attendees: undefined,
       });
     } else {
+      trackModuleAction('calendar', 'event_created', {
+        hasRecurrence: !!data.recurrence,
+        allDay: data.allDay,
+        hasReminders: (data.reminders?.length ?? 0) > 0,
+      });
       await createEvent({
         calendarId: data.calendarId,
         title: data.title,
@@ -157,7 +201,7 @@ function CalendarPage(): JSX.Element {
         start: data.start,
         end: data.end,
         allDay: data.allDay,
-        timezone: undefined,
+        timezone: data.timezone,
         recurrence: data.recurrence,
         category: data.category,
         color: data.color,
@@ -168,6 +212,7 @@ function CalendarPage(): JSX.Element {
   };
 
   const handleDeleteEvent = async (eventId: string): Promise<void> => {
+    trackModuleAction('calendar', 'event_deleted');
     await deleteEvent(eventId);
     closeEventEditor();
   };
@@ -191,6 +236,7 @@ function CalendarPage(): JSX.Element {
   };
 
   const handleDeleteCalendar = async (calendarId: string): Promise<void> => {
+    trackModuleAction('calendar', 'calendar_deleted');
     await deleteCalendar(calendarId);
 
     if (selectedCalendarIds.includes(calendarId)) {
@@ -256,6 +302,13 @@ function CalendarPage(): JSX.Element {
     onToggleState: handleToggleState,
   });
 
+  const viewTransition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
+  const viewVariants = {
+    initial: shouldReduceMotion ? {} : { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    exit: shouldReduceMotion ? {} : { opacity: 0, y: -10 },
+  };
+
   // Render the current view
   const renderView = (): JSX.Element => {
     switch (currentView) {
@@ -291,6 +344,7 @@ function CalendarPage(): JSX.Element {
             events={expandedEvents}
             selectedCalendarIds={selectedCalendarIds}
             selectedDate={selectedDate}
+            weekStartsOn={weekStartDay}
             onAddEvent={(timestamp: number) => {
               openEventEditor(null, timestamp);
             }}
@@ -320,6 +374,12 @@ function CalendarPage(): JSX.Element {
             calendars={calendars}
             events={expandedEvents}
             selectedCalendarIds={selectedCalendarIds}
+            onDeleteEvent={async (event: ExpandedEvent) => {
+              await handleDeleteEvent(event.id);
+            }}
+            onEditEvent={(event: ExpandedEvent) => {
+              openEventEditor(event, null);
+            }}
             onEventClick={handleEventClick}
           />
         );
@@ -332,6 +392,7 @@ function CalendarPage(): JSX.Element {
             events={expandedEvents}
             selectedCalendarIds={selectedCalendarIds}
             selectedDate={selectedDate}
+            weekStartsOn={weekStartDay}
             onAddEvent={(date: number) => {
               openEventEditor(null, date);
             }}
@@ -357,7 +418,12 @@ function CalendarPage(): JSX.Element {
   };
 
   return (
-    <div className="flex h-full flex-1 flex-col gap-4 p-4">
+    <motion.div
+      animate={{ opacity: 1 }}
+      className="flex min-h-full flex-1 flex-col gap-4 p-4"
+      initial={{ opacity: 0 }}
+      transition={viewTransition}
+    >
       {/* Error display */}
       <ErrorBanner error={error} onDismiss={clearError} />
 
@@ -369,9 +435,18 @@ function CalendarPage(): JSX.Element {
         onDateSelect={(date: number) => {
           setCurrentDate(date);
         }}
-        onNavigateNext={navigateNext}
-        onNavigatePrev={navigatePrev}
-        onNavigateToday={navigateToday}
+        onNavigateNext={() => {
+          trackModuleAction('calendar', 'navigate_next', { view: currentView });
+          navigateNext();
+        }}
+        onNavigatePrev={() => {
+          trackModuleAction('calendar', 'navigate_prev', { view: currentView });
+          navigatePrev();
+        }}
+        onNavigateToday={() => {
+          trackModuleAction('calendar', 'navigate_today');
+          navigateToday();
+        }}
         onNewEvent={() => openEventEditor(null, selectedDate ?? currentDate)}
         onViewChange={setView}
       />
@@ -434,8 +509,35 @@ function CalendarPage(): JSX.Element {
         )}
 
         {/* Calendar view */}
-        <div className="min-h-0 flex-1">{renderView()}</div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentView}
+            animate="animate"
+            className="min-h-0 flex-1"
+            exit="exit"
+            initial="initial"
+            transition={viewTransition}
+            variants={viewVariants}
+          >
+            {renderView()}
+          </motion.div>
+        </AnimatePresence>
       </div>
+
+      {/* Event preview dialog */}
+      {previewEvent && (
+        <EventPreview
+          calendar={getCalendarById(previewEvent.calendarId)}
+          event={previewEvent}
+          isOpen={isPreviewOpen}
+          onClose={() => {
+            setIsPreviewOpen(false);
+            setPreviewEvent(null);
+          }}
+          onDelete={handlePreviewDelete}
+          onEdit={handlePreviewEdit}
+        />
+      )}
 
       {/* Event editor modal */}
       {isEditorOpen && (
@@ -509,7 +611,7 @@ function CalendarPage(): JSX.Element {
           onEventClick={handleEventClick}
         />
       )}
-    </div>
+    </motion.div>
   );
 }
 

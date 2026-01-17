@@ -1,20 +1,27 @@
 # DOFTool
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Electron](https://img.shields.io/badge/Electron-33+-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
 **Decentralized, offline-first, end-to-end encrypted family collaboration for Calendar, Tasks, and Email.**
 
-DOFTool is a desktop application that helps families stay organized with shared calendars, tasks, and email management. Your data stays private with zero-knowledge encryption and syncs automatically between family devices over your local network.
+DOFTool is a privacy-focused desktop application that helps families stay organized with shared calendars, tasks, and email management. Your data stays private with zero-knowledge encryption and syncs automatically between family devices over your local network—no cloud servers required.
 
 ---
 
 ## Features
 
 ### Family Management
+
 - Create a family and invite members via QR code or token
 - Role-based permissions (Admin, Parent, Child, Guest)
 - Device management with per-device access controls
 - Secure family data with end-to-end encryption
 
 ### Calendar
+
 - Create multiple calendars with custom colors
 - Schedule events with recurrence support
 - Set reminders and notifications
@@ -22,20 +29,25 @@ DOFTool is a desktop application that helps families stay organized with shared 
 - Per-calendar and per-event sharing permissions
 
 ### Tasks
+
 - Organize tasks into lists
 - Set priorities, due dates, and assignees
 - Subtasks and checklists
 - Kanban board view
 - Import/Export via JSON
 
-### Email
+### Email _(In Development)_
+
 - Full IMAP/SMTP email client
-- Connect Gmail, Outlook, and other providers [soon] 
+- Connect Gmail, Outlook, and other providers
 - Family internal messaging system
 - Shared inbox access
 - Send-as permissions for family members
 
+> **Note:** The email module is currently being rebuilt. See [STATUS.md](docs/STATUS.md) for details.
+
 ### Sync & Privacy
+
 - Offline-first: works without internet
 - P2P sync over local WiFi (mDNS discovery)
 - Zero-knowledge E2EE (only your family can read data)
@@ -46,7 +58,7 @@ DOFTool is a desktop application that helps families stay organized with shared 
 
 ## Screenshots
 
-*Coming soon*
+_Coming soon_
 
 ---
 
@@ -56,11 +68,13 @@ DOFTool is a desktop application that helps families stay organized with shared 
 
 Download the latest release for your platform:
 
-| Platform | Download |
-|----------|----------|
-| Windows | [DOFTool-Setup.exe](https://github.com/doftool/doftool/releases/latest) |
-| macOS | [DOFTool.dmg](https://github.com/doftool/doftool/releases/latest) |
-| Linux | [DOFTool.AppImage](https://github.com/doftool/doftool/releases/latest) |
+| Platform | Download                                                                 |
+| -------- | ------------------------------------------------------------------------ |
+| Windows  | [DOFTool-win.zip](https://github.com/asterixix/DOFTool/releases/latest)  |
+| macOS    | [DOFTool.dmg](https://github.com/asterixix/DOFTool/releases/latest)      |
+| Linux    | [DOFTool.AppImage](https://github.com/asterixix/DOFTool/releases/latest) |
+
+> **Note:** DOFTool is currently in active development (v0.1.0). Pre-release builds may be available.
 
 ### System Requirements
 
@@ -75,6 +89,7 @@ Download the latest release for your platform:
 ### 1. Create a Family
 
 Launch DOFTool and click **"Create Family"**. Enter:
+
 - Family name
 - Your display name
 - A strong passphrase (this encrypts all family data)
@@ -106,8 +121,8 @@ Once devices are on the same WiFi network, they automatically discover and sync 
 
 ```bash
 # Clone the repository
-git clone https://github.com/doftool/doftool.git
-cd doftool
+git clone https://github.com/asterixix/DOFTool.git
+cd DOFTool
 
 # Install dependencies
 npm install
@@ -118,35 +133,41 @@ npm run dev
 
 ### Available Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start Electron in development mode |
-| `npm run build` | Build for production |
-| `npm run test` | Run unit tests |
-| `npm run test:e2e` | Run E2E tests |
-| `npm run lint` | Lint code |
-| `npm run format` | Format code with Prettier |
-| `npm run typecheck` | TypeScript type checking |
+| Script              | Description                        |
+| ------------------- | ---------------------------------- |
+| `npm run dev`       | Start Electron in development mode |
+| `npm run build`     | Build for production               |
+| `npm run test`      | Run unit tests                     |
+| `npm run test:e2e`  | Run E2E tests                      |
+| `npm run lint`      | Lint code                          |
+| `npm run format`    | Format code with Prettier          |
+| `npm run typecheck` | TypeScript type checking           |
 
 ### Project Structure
 
 ```
 DOFTool/
 ├── electron/               # Electron main process
-│   ├── main.ts
-│   ├── preload.ts
-│   └── services/          # Core services (crypto, sync, storage)
-├── src/                   # React renderer
-│   ├── app/               # App shell, routing, providers
-│   ├── modules/           # Feature modules
-│   │   ├── family/        # Family management
-│   │   ├── calendar/      # Calendar feature
-│   │   ├── tasks/         # Tasks feature
-│   │   └── email/         # Email client
-│   └── shared/            # Shared components, hooks, utils
-├── tests/                 # Test files
-├── docs/                  # Documentation
-└── package.json
+│   ├── main.ts             # Main entry point
+│   ├── preload.ts          # Preload script (IPC bridge)
+│   └── services/           # Core services
+│       ├── EncryptionService.ts    # E2EE encryption
+│       ├── YjsService.ts           # CRDT sync
+│       ├── EmailService.ts         # IMAP/SMTP
+│       ├── NotificationService.ts  # System notifications
+│       └── ...                     # Other services
+├── src/                    # React renderer
+│   ├── app/                # App shell, routing, providers
+│   ├── components/ui/      # Shared UI components (shadcn/ui)
+│   ├── hooks/              # Shared React hooks
+│   └── modules/            # Feature modules
+│       ├── family/         # Family management
+│       ├── calendar/       # Calendar feature
+│       ├── tasks/          # Tasks feature
+│       ├── email/          # Email client (in development)
+│       └── sync/           # Sync status & controls
+├── docs/                   # Technical documentation
+└── tests/                  # Test files
 ```
 
 ### Building for Production
@@ -165,29 +186,51 @@ npm run build:linux
 
 ## Tech Stack
 
-| Category | Technology |
-|----------|------------|
-| **Runtime** | Electron 33+ |
-| **Frontend** | React 19, TypeScript 5.5+ |
-| **Build** | Vite |
-| **UI** | shadcn/ui, Tailwind CSS 4, Framer Motion |
-| **State** | Zustand, React Query |
-| **Data** | Yjs (CRDT), LevelDB |
-| **Crypto** | libsodium-wrappers |
-| **Sync** | y-webrtc, mDNS (bonjour-service) |
-| **Email** | imapflow, nodemailer |
-| **Calendar** | ical.js, date-fns |
-| **Testing** | Vitest, React Testing Library, Playwright |
+| Category     | Technology                                |
+| ------------ | ----------------------------------------- |
+| **Runtime**  | Electron 33+                              |
+| **Frontend** | React 19, TypeScript 5.5+                 |
+| **Build**    | Vite                                      |
+| **UI**       | shadcn/ui, Tailwind CSS 4, Framer Motion  |
+| **State**    | Zustand, React Query                      |
+| **Data**     | Yjs (CRDT), LevelDB                       |
+| **Crypto**   | libsodium-wrappers                        |
+| **Sync**     | y-webrtc, mDNS (bonjour-service)          |
+| **Email**    | imapflow, nodemailer                      |
+| **Calendar** | ical.js, date-fns                         |
+| **Testing**  | Vitest, React Testing Library, Playwright |
 
 ---
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md) - System architecture and design
+📚 **[Full Documentation Index](docs/README.md)**
+
+### Getting Started
+
+- [Getting Started Guide](docs/GETTING-STARTED.md) - Quick start for new users
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+### Architecture & Design
+
+- [Architecture](docs/ARCHITECTURE.md) - System architecture and design decisions
 - [Data Model](docs/DATA-MODEL.md) - TypeScript interfaces and schemas
-- [Security](docs/SECURITY.md) - E2EE encryption model
-- [Sync Protocol](docs/SYNC-PROTOCOL.md) - P2P synchronization
-- [Contributing](docs/CONTRIBUTING.md) - Development guidelines
+- [Security Model](docs/SECURITY.md) - E2EE encryption and key management
+- [Sync Protocol](docs/SYNC-PROTOCOL.md) - P2P synchronization with Yjs
+
+### Development
+
+- [API Reference](docs/API.md) - IPC channels and service APIs
+- [Testing Guide](docs/TESTING.md) - Testing guidelines and best practices
+- [Design System](docs/DESIGN-SYSTEM.md) - UI components and styling
+- [Performance](docs/PERFORMANCE.md) - Performance optimization guide
+- [Environment Variables](docs/ENVIRONMENT-VARIABLES.md) - Configuration options
+- [Contributing](CONTRIBUTING.md) - How to contribute
+
+### Reference
+
+- [Changelog](docs/CHANGELOG.md) - Version history
+- [Status](docs/STATUS.md) - Current module status
 
 ---
 
@@ -202,9 +245,9 @@ DOFTool is designed with privacy as a core principle:
 
 ### Reporting Security Issues
 
-Please report security vulnerabilities to **security@doftool.app**. Do not open public issues for security concerns.
+Please report security vulnerabilities privately via [GitHub Security Advisories](https://github.com/asterixix/DOFTool/security/advisories/new) or email **artur@sendyka.dev**. Do not open public issues for security concerns.
 
-See [SECURITY.md](docs/SECURITY.md) for our full security model.
+See [SECURITY.md](SECURITY.md) for our vulnerability disclosure policy and [docs/SECURITY.md](docs/SECURITY.md) for the full security model.
 
 ---
 
@@ -234,28 +277,41 @@ Currently, sync requires devices to be on the same local network. Cloud relay su
 
 ## Roadmap
 
-- [x] Calendar with recurrence
-- [x] Task management
-- [x] E2EE encryption
-- [x] Local P2P sync
-- [ ] Email client (in progress)
+### Completed
+
+- [x] Calendar with recurrence support
+- [x] Task management with lists and priorities
+- [x] End-to-end encryption (XChaCha20-Poly1305)
+- [x] Local P2P sync via mDNS/WebRTC
+- [x] Family management with roles
+- [x] Yjs CRDT-based conflict resolution
+
+### In Progress
+
+- [ ] Email client (IMAP/SMTP) - _currently being rebuilt_
+- [ ] External calendar sync (CalDAV)
+
+### Planned
+
 - [ ] Mobile apps (React Native)
 - [ ] Cloud relay for remote sync
 - [ ] Calendar/task sharing links
 - [ ] Plugin system
+- [ ] Multi-language support
 
 ---
 
 ## Contributing
 
-We welcome contributions! Please read our [Contributing Guide](docs/CONTRIBUTING.md) before submitting PRs.
+We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting PRs.
 
 ### Ways to Contribute
 
-- Report bugs and suggest features
-- Improve documentation
-- Submit pull requests
-- Help with translations
+- **Report bugs** - Open an issue with reproduction steps
+- **Suggest features** - Discuss ideas in GitHub Discussions
+- **Improve documentation** - Fix typos or clarify explanations
+- **Submit pull requests** - Follow our coding standards
+- **Help with translations** - Internationalization coming soon
 
 ---
 
@@ -271,12 +327,13 @@ DOFTool is open source software licensed under the [MIT License](LICENSE).
 - [Yjs](https://github.com/yjs/yjs) - CRDT implementation
 - [shadcn/ui](https://ui.shadcn.com/) - UI components
 - [Electron](https://www.electronjs.org/) - Desktop framework
+- [libsodium](https://github.com/jedisct1/libsodium) - Cryptography library
 
 ---
 
 ## Contact
 
-- **Website**: [doftool.app](https://doftool.app)
-- **GitHub**: [github.com/doftool/doftool](https://github.com/doftool/doftool)
-- **Discord**: [discord.gg/doftool](https://discord.gg/doftool)
-- **Email**: hello@doftool.app
+- **Author**: Artur Sendyka
+- **Website**: [sendyka.dev](https://sendyka.dev)
+- **GitHub**: [github.com/asterixix/DOFTool](https://github.com/asterixix/DOFTool)
+- **Email**: artur@sendyka.dev

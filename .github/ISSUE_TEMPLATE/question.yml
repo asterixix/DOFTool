@@ -1,0 +1,67 @@
+name: ❓ Question / Support
+description: Ask a question about DOFTool or get help with setup
+title: "[Question]: "
+labels: ["question", "support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about DOFTool? We're here to help!
+        
+        **Before asking**, please check:
+        - 📖 [Documentation](https://github.com/asterixix/DOFTool/tree/main/docs)
+        - 💬 [Existing Q&A discussions](https://github.com/asterixix/DOFTool/discussions/categories/q-a)
+        - 🐛 [Existing issues](https://github.com/asterixix/DOFTool/issues)
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      options:
+        - Installation / Setup
+        - Configuration
+        - Family creation / joining
+        - Calendar usage
+        - Task management
+        - Email integration
+        - Sync / P2P connectivity
+        - Data migration
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: Ask your question here...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any relevant context that might help us answer your question.
+      placeholder: |
+        - What are you trying to achieve?
+        - What have you tried so far?
+        - Any relevant configuration or setup details?
+
+  - type: input
+    id: version
+    attributes:
+      label: DOFTool Version (if applicable)
+      placeholder: "e.g., 0.1.0"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System (if applicable)
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - N/A

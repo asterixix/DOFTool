@@ -262,7 +262,7 @@ function generateRRule(rule: RecurrenceRule): string {
 function generateVAlarm(reminder: EventReminder): string[] {
   const lines: string[] = ['BEGIN:VALARM'];
 
-  lines.push(`ACTION:${reminder.type === 'email' ? 'EMAIL' : 'DISPLAY'}`);
+  lines.push('ACTION:DISPLAY');
 
   // Trigger (negative means before event)
   const trigger = reminder.minutes === 0 ? 'PT0S' : `-PT${reminder.minutes}M`;

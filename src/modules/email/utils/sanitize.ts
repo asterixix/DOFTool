@@ -3,7 +3,9 @@
  * Uses DOMPurify to sanitize HTML email content
  */
 
-import DOMPurify from 'dompurify';
+import { default as DOMPurifyLib } from 'dompurify';
+
+const DOMPurify = DOMPurifyLib;
 
 /**
  * Sanitization configuration presets

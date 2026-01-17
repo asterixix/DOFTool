@@ -451,4 +451,60 @@
   .no-pull-refresh {
     overscroll-behavior-y: contain;
   }
+
+  /* Compact Mode Styles */
+  .compact-mode {
+    --spacing-unit: 0.5rem; /* Reduced from 1rem */
+    --spacing-xs: calc(var(--spacing-unit) * 0.25);
+    --spacing-sm: calc(var(--spacing-unit) * 0.5);
+    --spacing-md: var(--spacing-unit);
+    --spacing-lg: calc(var(--spacing-unit) * 1.5);
+    --spacing-xl: calc(var(--spacing-unit) * 2);
+  }
+
+  .compact-mode .card,
+  .compact-mode [class*='Card'] {
+    @apply p-3; /* Reduced padding */
+  }
+
+  .compact-mode .card-header,
+  .compact-mode [class*='CardHeader'] {
+    @apply p-3 pb-2; /* Reduced header padding */
+  }
+
+  .compact-mode .card-content,
+  .compact-mode [class*='CardContent'] {
+    @apply p-3 pt-2; /* Reduced content padding */
+  }
+
+  .compact-mode button,
+  .compact-mode [class*='Button'] {
+    @apply px-2 py-1 text-sm; /* Smaller buttons */
+  }
+
+  .compact-mode input,
+  .compact-mode textarea,
+  .compact-mode select {
+    @apply px-2 py-1 text-sm; /* Smaller inputs */
+  }
+
+  .compact-mode .space-y-6 {
+    @apply space-y-3; /* Reduced vertical spacing */
+  }
+
+  .compact-mode .space-y-4 {
+    @apply space-y-2; /* Reduced vertical spacing */
+  }
+
+  .compact-mode h1 {
+    @apply text-xl; /* Smaller heading */
+  }
+
+  .compact-mode h2 {
+    @apply text-lg; /* Smaller heading */
+  }
+
+  .compact-mode h3 {
+    @apply text-base; /* Smaller heading */
+  }
 }

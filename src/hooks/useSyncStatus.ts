@@ -25,6 +25,7 @@ interface UseSyncStatusResult {
   error: SyncResult['error'];
   isConnected: SyncResult['isConnected'];
   statusText: SyncResult['statusText'];
+  isInitialized: SyncResult['isInitialized'];
   isConnecting: boolean;
   isSyncing: boolean;
   isDiscovering: boolean;
@@ -52,6 +53,7 @@ export function useSyncStatus({
     error,
     isConnected,
     statusText,
+    isInitialized,
     refreshStatus,
     refreshPeers,
     forceSync,
@@ -96,6 +98,7 @@ export function useSyncStatus({
     lastSyncAt,
     error,
     statusText,
+    isInitialized,
     isConnected,
     isConnecting: status === 'connecting',
     isSyncing: status === 'syncing',

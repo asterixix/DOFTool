@@ -90,7 +90,7 @@ interface CreateEventData {
   recurrence: RecurrenceData | undefined;
   category: string | undefined;
   color: string | undefined;
-  reminders: Array<{ id: string; type: string; minutes: number }> | undefined;
+  reminders: Array<{ id: string; type?: string; minutes: number }> | undefined;
   attendees: AttendeeData[] | undefined;
 }
 
@@ -106,6 +106,18 @@ interface CalendarShare {
   permission: string;
   sharedAt: number;
   sharedBy: string;
+}
+
+interface ReminderPreferencesData {
+  enabled: boolean;
+  categories?: string[] | undefined;
+  minMinutesBefore?: number | undefined;
+  maxRemindersPerEvent?: number | undefined;
+}
+
+interface ReminderSettingsData {
+  global: ReminderPreferencesData;
+  calendarOverrides?: Record<string, Partial<ReminderPreferencesData>>;
 }
 
 // Task types for IPC
@@ -426,10 +438,46 @@ interface NotificationHistoryItem {
   data?: Record<string, unknown>;
 }
 
+interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  hasUpdate: boolean;
+  release?: {
+    tag_name: string;
+    name: string;
+    body: string;
+    published_at: string;
+    assets: Array<{
+      name: string;
+      browser_download_url: string;
+      size: number;
+    }>;
+    prerelease: boolean;
+    draft: boolean;
+  };
+  downloadUrl?: string;
+}
+
 interface ElectronAPI {
   // App info
   getVersion: () => Promise<string>;
   getPlatform: () => Promise<NodeJS.Platform>;
+  openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+
+  // Analytics - routes to main process Aptabase SDK
+  analytics: {
+    track: (
+      eventName: string,
+      props?: Record<string, string | number | boolean>
+    ) => Promise<{ success: boolean }>;
+  };
+
+  updater: {
+    check: (notifyIfAvailable?: boolean) => Promise<UpdateInfo>;
+    download: (releaseUrl?: string) => Promise<{ success: boolean; error?: string }>;
+    install: () => Promise<{ success: boolean; error?: string }>;
+    getLastChecked: () => Promise<number | null>;
+  };
 
   notifications: {
     getPreferences: () => Promise<NotificationPreferences>;
@@ -544,6 +592,10 @@ interface ElectronAPI {
     ) => Promise<CalendarShare>;
     unshare: (calendarId: string, memberId: string) => Promise<boolean>;
     getShares: (calendarId: string) => Promise<CalendarShare[]>;
+    reminderSettings: {
+      get: () => Promise<ReminderSettingsData>;
+      update: (update: Partial<ReminderSettingsData>) => Promise<ReminderSettingsData>;
+    };
     subscribeExternal: (
       calendarId: string,
       url: string,
@@ -683,6 +735,20 @@ interface ElectronAPI {
     testConnection: (input: TestConnectionInput) => Promise<TestConnectionResult>;
   };
 
+  // Crash Reporting operations
+  crashReporting: {
+    report: (error: {
+      message: string;
+      stack?: string;
+      filename?: string;
+      lineno?: number;
+      colno?: number;
+      userAgent?: string;
+      url?: string;
+      timestamp: number;
+    }) => Promise<{ success: boolean; issueNumber?: number; issueUrl?: string; error?: string }>;
+  };
+
   // Sync operations
   sync: {
     getStatus: () => Promise<{ status: string; peers: number }>;
@@ -701,4 +767,4 @@ declare global {
   }
 }
 
-export { ElectronAPI };
+export { ElectronAPI, ReminderSettingsData, ReminderPreferencesData };

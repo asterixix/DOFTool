@@ -1,12 +1,15 @@
+import { motion } from 'framer-motion';
 import { Menu, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { BRAND, DOFToolLogo } from '@/shared/brand';
 
 import { NotificationCenter } from '../components/NotificationCenter';
 import { SyncStatusPopover } from '../components/SyncStatusPopover';
+import { VersionBanner } from '../components/VersionBanner';
 
 interface HeaderProps {
   isMobile?: boolean;
@@ -22,9 +25,16 @@ export function Header({
   onToggleCollapse,
 }: HeaderProps): JSX.Element {
   const breadcrumbs = useBreadcrumbs();
+  const shouldReduceMotion = useReducedMotion();
+  const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-4 sm:px-6">
+    <motion.header
+      animate={{ opacity: 1, y: 0 }}
+      className="flex h-16 items-center justify-between border-b bg-card px-4 sm:px-6"
+      initial={{ opacity: 0, y: -10 }}
+      transition={transition}
+    >
       {/* Left: navigation + placeholder for title */}
       <div className="flex items-center gap-3 sm:gap-4">
         {isMobile ? (
@@ -81,9 +91,12 @@ export function Header({
         {/* Sync status popover */}
         <SyncStatusPopover />
 
+        {/* Version banner */}
+        <VersionBanner />
+
         {/* Notification center */}
         <NotificationCenter />
       </div>
-    </header>
+    </motion.header>
   );
 }

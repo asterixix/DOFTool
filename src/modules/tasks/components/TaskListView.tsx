@@ -2,6 +2,7 @@
  * TaskListView - List view for tasks with sorting and filtering
  */
 
+import { motion } from 'framer-motion';
 import { CheckSquare } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { EmptyState } from '@/shared/components';
 
 import { TaskItem } from './TaskItem';
@@ -43,6 +45,8 @@ export function TaskListView({
   onSearchChange,
   onCreateTask,
 }: TaskListViewProps): JSX.Element {
+  const shouldReduceMotion = useReducedMotion();
+  const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
   const handleDeleteTask = async (taskId: string): Promise<void> => {
     await onTaskDelete(taskId);
   };
@@ -161,21 +165,27 @@ export function TaskListView({
         ) : (
           // List view (simple or grouped by status if needed)
           <div className="space-y-2">
-            {sortedTasks.map((task) => {
+            {sortedTasks.map((task, index) => {
               const list = getListById(task.taskListId);
               return (
-                <TaskItem
+                <motion.div
                   key={task.id}
-                  list={list}
-                  task={task}
-                  variant="compact"
-                  onClick={() => onTaskClick(task)}
-                  onComplete={(completed) => onTaskComplete(task, completed)}
-                  onDelete={() => {
-                    void handleDeleteTask(task.id);
-                  }}
-                  onEdit={() => onTaskClick(task)}
-                />
+                  animate={{ opacity: 1, x: 0 }}
+                  initial={{ opacity: 0, x: -10 }}
+                  transition={{ ...transition, delay: shouldReduceMotion ? 0 : index * 0.03 }}
+                >
+                  <TaskItem
+                    list={list}
+                    task={task}
+                    variant="compact"
+                    onClick={() => onTaskClick(task)}
+                    onComplete={(completed) => onTaskComplete(task, completed)}
+                    onDelete={() => {
+                      void handleDeleteTask(task.id);
+                    }}
+                    onEdit={() => onTaskClick(task)}
+                  />
+                </motion.div>
               );
             })}
           </div>

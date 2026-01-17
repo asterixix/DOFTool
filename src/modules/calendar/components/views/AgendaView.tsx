@@ -4,9 +4,11 @@
 
 import { format, isToday, isTomorrow, isThisWeek, startOfDay } from 'date-fns';
 
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 
 import { EventCard } from '../EventCard';
+import { EventContextMenu } from '../EventContextMenu';
 
 import type { ExpandedEvent, Calendar } from '../../types/Calendar.types';
 
@@ -15,6 +17,8 @@ interface AgendaViewProps {
   calendars: Calendar[];
   selectedCalendarIds?: string[];
   onEventClick: (event: ExpandedEvent) => void;
+  onEditEvent?: (event: ExpandedEvent) => void;
+  onDeleteEvent?: (event: ExpandedEvent) => void;
 }
 
 interface EventGroup {
@@ -28,6 +32,8 @@ export function AgendaView({
   calendars,
   selectedCalendarIds,
   onEventClick,
+  onEditEvent,
+  onDeleteEvent,
 }: AgendaViewProps): JSX.Element {
   // Ensure events have expected runtime types to satisfy the linter/type-checks.
   function isValidEvent(e: unknown): e is ExpandedEvent {
@@ -138,13 +144,24 @@ export function AgendaView({
             {/* Events list */}
             <div className="space-y-2 pl-[60px]">
               {group.events.map((event) => (
-                <EventCard
-                  key={event.id}
-                  calendar={getCalendarById(event.calendarId)}
-                  event={event}
-                  variant="detailed"
-                  onClick={() => onEventClick(event)}
-                />
+                <ContextMenu key={event.id}>
+                  <ContextMenuTrigger asChild>
+                    <div>
+                      <EventCard
+                        calendar={getCalendarById(event.calendarId)}
+                        event={event}
+                        variant="detailed"
+                        onClick={() => onEventClick(event)}
+                      />
+                    </div>
+                  </ContextMenuTrigger>
+                  <EventContextMenu
+                    event={event}
+                    onDeleteEvent={onDeleteEvent}
+                    onEditEvent={onEditEvent}
+                    onEventClick={onEventClick}
+                  />
+                </ContextMenu>
               ))}
             </div>
           </div>

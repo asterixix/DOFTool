@@ -2,7 +2,6 @@
  * Peer Connection Service - WebRTC peer connection management
  *
  * Manages WebRTC peer connections for P2P data synchronization.
- * Uses @roamhq/wrtc package for Node.js WebRTC support in Electron main process.
  */
 
 import { EventEmitter } from 'events';
@@ -49,30 +48,6 @@ export interface WebRTCFactory {
   createPeerConnection(config?: RTCConfiguration): PeerConnectionLike;
 }
 
-/** Default WebRTC factory using @roamhq/wrtc package */
-type WebRTCModule = {
-  RTCPeerConnection: new (config?: RTCConfiguration) => PeerConnectionLike;
-};
-
-let wrtcModule: WebRTCModule | null = null;
-
-function loadWrtc(): WebRTCModule | null {
-  if (!wrtcModule) {
-    try {
-      // Dynamic import of @roamhq/wrtc package
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const wrtc = require('@roamhq/wrtc') as { default?: WebRTCModule } & WebRTCModule;
-      wrtcModule = wrtc.default ?? wrtc;
-    } catch (error) {
-      console.error('[PeerConnectionService] Failed to load @roamhq/wrtc:', error);
-      // wrtc is optional - WebRTC can work without it in renderer process
-      console.error('[PeerConnectionService] WebRTC will be limited without @roamhq/wrtc package');
-      return null;
-    }
-  }
-  return wrtcModule;
-}
-
 export class PeerConnectionService extends EventEmitter {
   private config: PeerConnectionConfig | null = null;
   private connections: Map<string, PeerConnection> = new Map();
@@ -92,18 +67,6 @@ export class PeerConnectionService extends EventEmitter {
    */
   initialize(config: PeerConnectionConfig): void {
     this.config = config;
-
-    // Load wrtc module and create default factory
-    const wrtc = loadWrtc();
-    if (wrtc) {
-      this.webrtcFactory = {
-        createPeerConnection: (rtcConfig?: RTCConfiguration) => {
-          return new wrtc.RTCPeerConnection(
-            rtcConfig ?? this.defaultRtcConfig
-          ) as unknown as PeerConnectionLike;
-        },
-      };
-    }
   }
 
   /**

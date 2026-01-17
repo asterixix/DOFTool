@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/asterixix/DOFTool/security/advisories/new
+    about: Report security vulnerabilities privately. Do NOT open public issues for security concerns.
+  - name: 💬 Discussions
+    url: https://github.com/asterixix/DOFTool/discussions
+    about: For general discussions, ideas, and community conversations.
+  - name: 📖 Documentation
+    url: https://github.com/asterixix/DOFTool/tree/main/docs
+    about: Check the docs before asking questions - your answer might already be there!

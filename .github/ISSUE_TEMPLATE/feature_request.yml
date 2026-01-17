@@ -1,0 +1,106 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for DOFTool
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! We'd love to hear your ideas for improving DOFTool.
+        
+        Please check our [roadmap](https://github.com/asterixix/DOFTool/projects) first to see if this feature is already planned.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues to ensure this feature hasn't been requested
+          required: true
+        - label: This feature aligns with DOFTool's focus on family collaboration and privacy
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe.
+      placeholder: "A clear description of what the problem is. Example: I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like.
+      placeholder: A clear and concise description of what you want to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered.
+      placeholder: Other approaches you've thought about...
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Related Module
+      description: Which part of DOFTool does this feature relate to?
+      multiple: true
+      options:
+        - Calendar
+        - Tasks
+        - Email
+        - Family/Sync
+        - Settings
+        - Encryption/Security
+        - UI/UX
+        - New Module
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this feature to you?
+      options:
+        - Nice to have
+        - Would improve my workflow
+        - Important for my use case
+        - Critical - blocking my adoption
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe a specific scenario where this feature would be useful.
+      placeholder: |
+        As a [type of user], I want to [do something] so that [benefit].
+        
+        Example scenario:
+        - My family has 5 members with different schedules...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to help implement this feature?
+      options:
+        - label: I would be willing to submit a PR for this feature
+        - label: I can help test this feature
+        - label: I can help document this feature
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, mockups, or screenshots about the feature request here.

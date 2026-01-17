@@ -4,9 +4,11 @@
 
 import { useState } from 'react';
 
+import { motion } from 'framer-motion';
 import { LayoutGrid } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/shared/components';
 
@@ -66,6 +68,8 @@ export function TaskBoardView({
 }: TaskBoardViewProps): JSX.Element {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [activeColumn, setActiveColumn] = useState<TaskStatus | null>(null);
+  const shouldReduceMotion = useReducedMotion();
+  const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
 
   const handleDeleteTask = async (taskId: string): Promise<void> => {
     await onTaskDelete(taskId);
@@ -118,12 +122,15 @@ export function TaskBoardView({
             />
           </div>
         ) : (
-          STATUS_COLUMNS.map((column) => {
+          STATUS_COLUMNS.map((column, columnIndex) => {
             const columnTasks = getTasksByStatus(column.status);
             return (
-              <div
+              <motion.div
                 key={column.status}
+                animate={{ opacity: 1, x: 0 }}
                 className="flex min-w-[240px] flex-col sm:min-w-[280px]"
+                initial={{ opacity: 0, x: -20 }}
+                transition={{ ...transition, delay: shouldReduceMotion ? 0 : columnIndex * 0.05 }}
                 onDragLeave={() => {
                   if (activeColumn === column.status) {
                     setActiveColumn(null);
@@ -162,32 +169,41 @@ export function TaskBoardView({
                       No tasks in this column
                     </div>
                   ) : (
-                    columnTasks.map((task) => (
-                      <TaskItem
+                    columnTasks.map((task, taskIndex) => (
+                      <motion.div
                         key={task.id}
-                        draggable
-                        list={getListById(task.taskListId)}
-                        task={task}
-                        variant="compact"
-                        onClick={() => onTaskClick(task)}
-                        onComplete={(completed) => onTaskComplete(task, completed)}
-                        onDelete={() => {
-                          void handleDeleteTask(task.id);
+                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, y: 10 }}
+                        transition={{
+                          ...transition,
+                          delay: shouldReduceMotion ? 0 : taskIndex * 0.03,
                         }}
-                        onDragEnd={() => {
-                          setDraggingTaskId(null);
-                          setActiveColumn(null);
-                        }}
-                        onDragStart={(dragTask) => {
-                          setDraggingTaskId(dragTask.id);
-                          setActiveColumn(column.status);
-                        }}
-                        onEdit={() => onTaskClick(task)}
-                      />
+                      >
+                        <TaskItem
+                          draggable
+                          list={getListById(task.taskListId)}
+                          task={task}
+                          variant="compact"
+                          onClick={() => onTaskClick(task)}
+                          onComplete={(completed) => onTaskComplete(task, completed)}
+                          onDelete={() => {
+                            void handleDeleteTask(task.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingTaskId(null);
+                            setActiveColumn(null);
+                          }}
+                          onDragStart={(dragTask) => {
+                            setDraggingTaskId(dragTask.id);
+                            setActiveColumn(column.status);
+                          }}
+                          onEdit={() => onTaskClick(task)}
+                        />
+                      </motion.div>
                     ))
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           })
         )}

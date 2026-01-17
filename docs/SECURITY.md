@@ -1,6 +1,6 @@
-# FamilySync Security Model
+# DOFTool Security Model
 
-This document describes the end-to-end encryption (E2EE) architecture, key management, and security practices for FamilySync.
+This document describes the end-to-end encryption (E2EE) architecture, key management, and security practices for DOFTool.
 
 ---
 
@@ -20,7 +20,7 @@ This document describes the end-to-end encryption (E2EE) architecture, key manag
 
 ## Security Overview
 
-FamilySync implements a **zero-knowledge, end-to-end encrypted** architecture where:
+DOFTool implements a **zero-knowledge, end-to-end encrypted** architecture where:
 
 - All data is encrypted before leaving the device
 - Only family members with the correct keys can decrypt data
@@ -30,28 +30,28 @@ FamilySync implements a **zero-knowledge, end-to-end encrypted** architecture wh
 
 ### Security Guarantees
 
-| Guarantee | Description |
-|-----------|-------------|
-| **Confidentiality** | Only family members can read data |
-| **Integrity** | Tampering is detected via authenticated encryption |
-| **Authenticity** | Messages are verifiably from family members |
+| Guarantee           | Description                                         |
+| ------------------- | --------------------------------------------------- |
+| **Confidentiality** | Only family members can read data                   |
+| **Integrity**       | Tampering is detected via authenticated encryption  |
+| **Authenticity**    | Messages are verifiably from family members         |
 | **Forward Secrecy** | Past sessions remain secure if keys are compromised |
-| **Local-First** | Data never touches external servers unencrypted |
+| **Local-First**     | Data never touches external servers unencrypted     |
 
 ---
 
 ## Cryptographic Primitives
 
-FamilySync uses **libsodium** for all cryptographic operations:
+DOFTool uses **libsodium** for all cryptographic operations:
 
-| Purpose | Algorithm | Library |
-|---------|-----------|---------|
-| Symmetric Encryption | XChaCha20-Poly1305 | `crypto_secretbox_*` |
-| Asymmetric Encryption | X25519 + XSalsa20-Poly1305 | `crypto_box_*` |
-| Key Derivation | Argon2id | `crypto_pwhash_*` |
-| Digital Signatures | Ed25519 | `crypto_sign_*` |
-| Hashing | BLAKE2b | `crypto_generichash_*` |
-| Random Generation | ChaCha20 CSPRNG | `randombytes_buf` |
+| Purpose               | Algorithm                  | Library                |
+| --------------------- | -------------------------- | ---------------------- |
+| Symmetric Encryption  | XChaCha20-Poly1305         | `crypto_secretbox_*`   |
+| Asymmetric Encryption | X25519 + XSalsa20-Poly1305 | `crypto_box_*`         |
+| Key Derivation        | Argon2id                   | `crypto_pwhash_*`      |
+| Digital Signatures    | Ed25519                    | `crypto_sign_*`        |
+| Hashing               | BLAKE2b                    | `crypto_generichash_*` |
+| Random Generation     | ChaCha20 CSPRNG            | `randombytes_buf`      |
 
 ### Why These Choices?
 
@@ -100,22 +100,26 @@ FamilySync uses **libsodium** for all cryptographic operations:
 ### Key Descriptions
 
 #### Family Master Key (FMK)
+
 - **Derivation**: Argon2id from admin passphrase + random salt
 - **Length**: 32 bytes (256 bits)
 - **Storage**: Encrypted with each device's key, stored locally
 - **Rotation**: Possible via admin, re-encrypts all data
 
 #### Data Encryption Key (DEK)
+
 - **Derivation**: HKDF from FMK with context "data-encryption"
 - **Length**: 32 bytes
 - **Purpose**: Encrypts all Yjs documents and local storage
 
 #### Member Keys
+
 - **Type**: Ed25519 key pairs (signing) + X25519 key pairs (encryption)
 - **Generation**: On member device during registration
 - **Storage**: Private key encrypted with FMK, public key shared
 
 #### Device Keys
+
 - **Type**: X25519 key pairs
 - **Generation**: On first app launch
 - **Storage**: OS-provided secure storage (Keychain, Credential Manager)
@@ -254,12 +258,12 @@ FamilySync uses **libsodium** for all cryptographic operations:
 ```typescript
 interface InviteToken {
   // Token structure (JSON, then encrypted)
-  familyId: string;           // UUID of family
-  tempPublicKey: string;      // Base64 X25519 public key
-  token: string;              // Random 32-byte token (base64)
-  signature: string;          // Ed25519 signature by admin
-  exp: number;                // Unix timestamp expiration
-  role: MemberRole;           // Role to assign
+  familyId: string; // UUID of family
+  tempPublicKey: string; // Base64 X25519 public key
+  token: string; // Random 32-byte token (base64)
+  signature: string; // Ed25519 signature by admin
+  exp: number; // Unix timestamp expiration
+  role: MemberRole; // Role to assign
 }
 
 // Generation process
@@ -271,10 +275,10 @@ function generateInviteToken(
 ): string {
   // 1. Generate temporary keypair for this invite
   const tempKeyPair = sodium.crypto_box_keypair();
-  
+
   // 2. Generate random token
   const token = sodium.randombytes_buf(32);
-  
+
   // 3. Create payload
   const payload = {
     familyId: family.id,
@@ -283,16 +287,18 @@ function generateInviteToken(
     exp: Date.now() + expiresInHours * 3600000,
     role,
   };
-  
+
   // 4. Sign payload
   const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
   const signature = sodium.crypto_sign_detached(payloadBytes, adminSigningKey);
-  
+
   // 5. Encode for QR/sharing
-  return base64url.encode(JSON.stringify({
-    ...payload,
-    signature: sodium.to_base64(signature),
-  }));
+  return base64url.encode(
+    JSON.stringify({
+      ...payload,
+      signature: sodium.to_base64(signature),
+    })
+  );
 }
 ```
 
@@ -306,28 +312,24 @@ async function verifyInviteToken(
   try {
     // 1. Decode token
     const token = JSON.parse(base64url.decode(tokenString));
-    
+
     // 2. Check expiration
     if (Date.now() > token.exp) {
       throw new Error('Token expired');
     }
-    
+
     // 3. Verify signature
     const payload = { ...token };
     delete payload.signature;
     const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
     const signature = sodium.from_base64(token.signature);
-    
-    const valid = sodium.crypto_sign_verify_detached(
-      signature,
-      payloadBytes,
-      adminPublicKey
-    );
-    
+
+    const valid = sodium.crypto_sign_verify_detached(signature, payloadBytes, adminPublicKey);
+
     if (!valid) {
       throw new Error('Invalid signature');
     }
-    
+
     return payload;
   } catch (error) {
     console.error('Token verification failed:', error);
@@ -354,14 +356,14 @@ async function verifyInviteToken(
 async function initializeDevice(): Promise<DeviceKeys> {
   // 1. Generate device keypair
   const keyPair = sodium.crypto_box_keypair();
-  
+
   // 2. Generate device ID
   const deviceId = crypto.randomUUID();
-  
+
   // 3. Store private key in OS secure storage
   await secureStorage.set('device_private_key', keyPair.privateKey);
   await secureStorage.set('device_id', deviceId);
-  
+
   // 4. Return public info for registration
   return {
     deviceId,
@@ -389,18 +391,14 @@ async function verifyPeerDevice(
 ): Promise<boolean> {
   // 1. Verify signature on device ID
   const message = new TextEncoder().encode(`${peerId}:${familyId}`);
-  const valid = sodium.crypto_sign_verify_detached(
-    peerSignature,
-    message,
-    peerPublicKey
-  );
-  
+  const valid = sodium.crypto_sign_verify_detached(peerSignature, message, peerPublicKey);
+
   if (!valid) return false;
-  
+
   // 2. Check if device is in family's device list
   const device = await getDeviceFromYjs(peerId);
   if (!device || device.familyId !== familyId) return false;
-  
+
   // 3. Verify public key matches stored key
   return device.publicKey === sodium.to_base64(peerPublicKey);
 }
@@ -414,23 +412,23 @@ async function verifyPeerDevice(
 
 All local data is encrypted:
 
-| Data Type | Encryption | Key |
-|-----------|------------|-----|
-| Yjs Documents | XChaCha20-Poly1305 | DEK |
-| Email Cache | XChaCha20-Poly1305 | DEK |
-| Attachments | XChaCha20-Poly1305 | DEK |
-| App Settings | XChaCha20-Poly1305 | Device Key |
-| FMK Storage | XChaCha20-Poly1305 | Device Key |
+| Data Type     | Encryption         | Key        |
+| ------------- | ------------------ | ---------- |
+| Yjs Documents | XChaCha20-Poly1305 | DEK        |
+| Email Cache   | XChaCha20-Poly1305 | DEK        |
+| Attachments   | XChaCha20-Poly1305 | DEK        |
+| App Settings  | XChaCha20-Poly1305 | Device Key |
+| FMK Storage   | XChaCha20-Poly1305 | Device Key |
 
 ### In Transit Encryption
 
 All network communication is encrypted:
 
-| Channel | Encryption |
-|---------|------------|
-| WebRTC Data | DTLS 1.3 |
+| Channel     | Encryption                     |
+| ----------- | ------------------------------ |
+| WebRTC Data | DTLS 1.3                       |
 | Yjs Updates | Application-layer (DEK) + DTLS |
-| IMAP/SMTP | TLS 1.3 |
+| IMAP/SMTP   | TLS 1.3                        |
 
 ### Memory Protection
 
@@ -462,7 +460,7 @@ async function decryptWithKey(
   try {
     const nonce = ciphertext.slice(0, 24);
     const ct = ciphertext.slice(24);
-    
+
     const plaintext = sodium.crypto_secretbox_open_easy(ct, nonce, keyMaterial);
     return plaintext;
   } finally {
@@ -494,24 +492,24 @@ try {
 
 ### What We Protect Against
 
-| Threat | Mitigation |
-|--------|------------|
-| **Network Eavesdropping** | E2EE + DTLS |
-| **Malicious Relay** | Zero-knowledge (can't read data) |
-| **Device Theft** | Encrypted storage + device key |
-| **Brute Force** | Argon2id (memory-hard KDF) |
-| **Replay Attacks** | Unique nonces, timestamps |
-| **Man-in-the-Middle** | Signed device keys, challenge-response |
-| **Key Compromise** | Forward secrecy, key rotation |
+| Threat                    | Mitigation                             |
+| ------------------------- | -------------------------------------- |
+| **Network Eavesdropping** | E2EE + DTLS                            |
+| **Malicious Relay**       | Zero-knowledge (can't read data)       |
+| **Device Theft**          | Encrypted storage + device key         |
+| **Brute Force**           | Argon2id (memory-hard KDF)             |
+| **Replay Attacks**        | Unique nonces, timestamps              |
+| **Man-in-the-Middle**     | Signed device keys, challenge-response |
+| **Key Compromise**        | Forward secrecy, key rotation          |
 
 ### What We Don't Protect Against
 
-| Threat | Reason |
-|--------|--------|
-| **Compromised Admin Device** | Admin has full access by design |
-| **Malware on Device** | Out of scope (OS responsibility) |
-| **Rubber Hose Cryptanalysis** | Physical security not addressed |
-| **Quantum Computing** | Current algorithms not quantum-safe |
+| Threat                        | Reason                              |
+| ----------------------------- | ----------------------------------- |
+| **Compromised Admin Device**  | Admin has full access by design     |
+| **Malware on Device**         | Out of scope (OS responsibility)    |
+| **Rubber Hose Cryptanalysis** | Physical security not addressed     |
+| **Quantum Computing**         | Current algorithms not quantum-safe |
 
 ### Trust Boundaries
 
@@ -619,10 +617,10 @@ Before release, verify:
 
 If a security issue is discovered:
 
-1. **Report**: Email security@familysync.app (PGP key available)
+1. **Report**: Email artur@sendyka.dev or use [GitHub Security Advisories](https://github.com/asterixix/DOFTool/security/advisories/new)
 2. **Assessment**: Determine scope and impact
 3. **Mitigation**: Push emergency update if needed
 4. **Communication**: Notify affected users
 5. **Post-Mortem**: Document and improve
 
-See [SECURITY.md](./SECURITY-REPORTING.md) for responsible disclosure policy.
+See [SECURITY.md](../SECURITY.md) for responsible disclosure policy.

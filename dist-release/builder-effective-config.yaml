@@ -1,0 +1,43 @@
+directories:
+  output: dist-release
+  buildResources: build
+appId: app.doftool.desktop
+productName: DOFTool
+forceCodeSigning: false
+publish:
+  provider: github
+  owner: doftool
+  repo: doftool
+files:
+  - filter:
+      - dist/**/*
+      - package.json
+win:
+  target:
+    - nsis
+    - zip
+  icon: build/icon.ico
+  sign: null
+  certificateFile: null
+  certificatePassword: <stripped sensitive data>
+  certificateSubjectName: null
+  certificateSha1: null
+  publisherName: null
+mac:
+  target:
+    - dmg
+    - zip
+  icon: build/icon.icns
+  category: public.app-category.productivity
+  identity: null
+linux:
+  target:
+    - AppImage
+    - deb
+  icon: build/icons
+  category: Office
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+electronVersion: 33.4.11

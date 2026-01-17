@@ -60,11 +60,12 @@ export {
 
 /**
  * Get the date range for a calendar view
+ * @param weekStartsOn - 0 for Sunday, 1 for Monday (defaults to 0)
  */
 export function getViewDateRange(
   date: Date | number,
   view: CalendarView,
-  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0
+  weekStartsOn: 0 | 1 = 0
 ): { start: Date; end: Date } {
   const d = typeof date === 'number' ? new Date(date) : date;
 
@@ -120,7 +121,11 @@ export function getMonthViewDays(
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0
 ): Date[] {
   const d = typeof date === 'number' ? new Date(date) : date;
-  const { start, end } = getViewDateRange(d, 'month', weekStartsOn);
+  const { start, end } = getViewDateRange(
+    d,
+    'month',
+    weekStartsOn === 0 || weekStartsOn === 1 ? weekStartsOn : 0
+  );
   return eachDayOfInterval({ start, end });
 }
 

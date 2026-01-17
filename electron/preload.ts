@@ -277,10 +277,62 @@ interface NotificationHistoryItem {
   data?: Record<string, unknown>;
 }
 
+interface ReminderPreferencesData {
+  enabled: boolean;
+  categories?: string[];
+  minMinutesBefore?: number;
+  maxRemindersPerEvent?: number;
+}
+
+interface ReminderSettingsData {
+  global: ReminderPreferencesData;
+  calendarOverrides?: Record<string, Partial<ReminderPreferencesData>>;
+}
+
+interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  hasUpdate: boolean;
+  release?: {
+    tag_name: string;
+    name: string;
+    body: string;
+    published_at: string;
+    assets: Array<{
+      name: string;
+      browser_download_url: string;
+      size: number;
+    }>;
+    prerelease: boolean;
+    draft: boolean;
+  };
+  downloadUrl?: string;
+}
+
 const electronAPI = {
   // App info
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   getPlatform: (): Promise<NodeJS.Platform> => ipcRenderer.invoke('app:platform'),
+  openExternal: (url: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:openExternal', url),
+
+  // Analytics - routes to main process Aptabase SDK
+  analytics: {
+    track: (
+      eventName: string,
+      props?: Record<string, string | number | boolean>
+    ): Promise<{ success: boolean }> => ipcRenderer.invoke('analytics:track', eventName, props),
+  },
+
+  updater: {
+    check: (notifyIfAvailable?: boolean): Promise<UpdateInfo> =>
+      ipcRenderer.invoke('updater:check', notifyIfAvailable),
+    download: (releaseUrl?: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('updater:download', releaseUrl),
+    install: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('updater:install'),
+    getLastChecked: (): Promise<number | null> => ipcRenderer.invoke('updater:lastChecked'),
+  },
 
   notifications: {
     getPreferences: (): Promise<NotificationPreferences> =>
@@ -456,6 +508,11 @@ const electronAPI = {
       ipcRenderer.invoke('calendar:updateShare', calendarId, memberId, permission),
     unshare: (calendarId: string, memberId: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('calendar:unshare', calendarId, memberId),
+    reminderSettings: {
+      get: (): Promise<ReminderSettingsData> => ipcRenderer.invoke('calendar:reminderSettings:get'),
+      update: (update: Partial<ReminderSettingsData>): Promise<ReminderSettingsData> =>
+        ipcRenderer.invoke('calendar:reminderSettings:update', update),
+    },
     getShares: (
       calendarId: string
     ): Promise<
@@ -633,6 +690,7 @@ const electronAPI = {
       peerCount: number;
       lastSyncAt: number | null;
       error?: string;
+      isInitialized?: boolean;
     }> => ipcRenderer.invoke('sync:status'),
     forceSync: (): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('sync:force'),
@@ -656,6 +714,8 @@ const electronAPI = {
         discoveredAt: number;
       }>
     > => ipcRenderer.invoke('sync:discovered-peers'),
+    initialize: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('sync:initialize'),
   },
 
   // Event listeners

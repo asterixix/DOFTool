@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
+import { useSettingsStore } from '@/stores/settings.store';
+
 type Theme = 'dark' | 'light' | 'system';
 
 interface ThemeProviderProps {
@@ -25,9 +27,21 @@ export function ThemeProvider({
   defaultTheme = 'system',
   storageKey = 'theme',
 }: ThemeProviderProps): JSX.Element {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  );
+  // Sync with settings store for theme
+  const storeTheme = useSettingsStore((state) => state.appearance.theme);
+  const updateAppearanceSettings = useSettingsStore((state) => state.updateAppearanceSettings);
+
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Prefer settings store theme, fallback to localStorage, then default
+    return (storeTheme as Theme) || (localStorage.getItem(storageKey) as Theme) || defaultTheme;
+  });
+
+  // Sync theme state when store theme changes
+  useEffect(() => {
+    if (storeTheme) {
+      setTheme(storeTheme as Theme);
+    }
+  }, [storeTheme]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -48,9 +62,11 @@ export function ThemeProvider({
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+    setTheme: (newTheme: Theme) => {
+      // Update both local state and settings store
+      setTheme(newTheme);
+      updateAppearanceSettings({ theme: newTheme });
+      localStorage.setItem(storageKey, newTheme);
     },
   };
 

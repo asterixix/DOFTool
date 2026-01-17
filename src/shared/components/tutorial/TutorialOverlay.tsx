@@ -7,6 +7,7 @@ import { X, ArrowRight, ArrowLeft, Lightbulb } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settings.store';
 
@@ -17,6 +18,7 @@ import type { TutorialOverlayProps } from './Tutorial.types';
 export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Element | null {
   const { tutorial, nextTutorialStep, skipTutorial } = useSettingsStore();
   const { showTutorial, currentStep } = tutorial;
+  const shouldReduceMotion = useReducedMotion();
 
   const stepContent = TUTORIAL_CONTENT.find((step) => step.id === currentStep);
   const progress = getTutorialProgress(currentStep);
@@ -58,10 +60,10 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
       >
         <motion.div
           key={currentStep}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: 0.2 }}
+          animate={shouldReduceMotion ? {} : { opacity: 1, scale: 1, y: 0 }}
+          exit={shouldReduceMotion ? {} : { opacity: 0, scale: 0.95, y: 20 }}
+          initial={shouldReduceMotion ? {} : { opacity: 0, scale: 0.95, y: 20 }}
+          transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.2 }}
         >
           <Card className="relative w-full max-w-lg">
             {/* Close button */}
@@ -106,10 +108,12 @@ export function TutorialOverlay({ className }: TutorialOverlayProps): JSX.Elemen
                 {stepContent.features.map((feature, index) => (
                   <motion.li
                     key={index}
-                    animate={{ opacity: 1, x: 0 }}
+                    animate={shouldReduceMotion ? {} : { opacity: 1, x: 0 }}
                     className="flex items-start gap-3"
-                    initial={{ opacity: 0, x: -10 }}
-                    transition={{ delay: index * 0.1 }}
+                    initial={shouldReduceMotion ? {} : { opacity: 0, x: -10 }}
+                    transition={
+                      shouldReduceMotion ? { duration: 0 } : { delay: index * 0.1, duration: 0.2 }
+                    }
                   >
                     <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
                     <span className="text-sm text-muted-foreground">{feature}</span>

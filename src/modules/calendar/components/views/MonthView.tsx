@@ -4,17 +4,13 @@
 
 import { format, isSameMonth, isSameDay, isToday, startOfDay, endOfDay } from 'date-fns';
 
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 
 import { CALENDAR_COLORS } from '../../types/Calendar.types';
 import { getMonthViewWeeks } from '../../utils/dateHelpers';
+import { DateContextMenu } from '../DateContextMenu';
+import { EventContextMenu } from '../EventContextMenu';
 import { EventHovercard } from '../EventHovercard';
 import { EventTriggerButton } from '../EventTriggerButton';
 
@@ -204,7 +200,8 @@ export function MonthView({
                                       colorClasses.border,
                                       'border'
                                     )}
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       onEventClick(event);
                                     }}
                                   >
@@ -221,65 +218,12 @@ export function MonthView({
                                   </EventTriggerButton>
                                 </EventHovercard>
                               </ContextMenuTrigger>
-                              <ContextMenuContent>
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    if (onEditEvent) {
-                                      onEditEvent(event);
-                                    } else {
-                                      onEventClick(event);
-                                    }
-                                  }}
-                                >
-                                  <svg
-                                    className="mr-2 h-4 w-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    viewBox="0 0 24 24"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                  >
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                  </svg>
-                                  Edit
-                                </ContextMenuItem>
-                                {onDeleteEvent && (
-                                  <>
-                                    <ContextMenuSeparator />
-                                    <ContextMenuItem
-                                      className="text-destructive focus:text-destructive"
-                                      onClick={() => {
-                                        if (
-                                          confirm(
-                                            `Are you sure you want to delete "${event.title}"?`
-                                          )
-                                        ) {
-                                          onDeleteEvent(event);
-                                        }
-                                      }}
-                                    >
-                                      <svg
-                                        className="mr-2 h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                      >
-                                        <path d="M3 6h18" />
-                                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                                      </svg>
-                                      Delete
-                                    </ContextMenuItem>
-                                  </>
-                                )}
-                              </ContextMenuContent>
+                              <EventContextMenu
+                                event={event}
+                                onDeleteEvent={onDeleteEvent}
+                                onEditEvent={onEditEvent}
+                                onEventClick={onEventClick}
+                              />
                             </ContextMenu>
                           );
                         })}
@@ -305,56 +249,12 @@ export function MonthView({
                       </div>
                     </div>
                   </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    {onAddEvent && (
-                      <ContextMenuItem
-                        onClick={() => {
-                          onAddEvent(day.getTime());
-                        }}
-                      >
-                        <svg
-                          className="mr-2 h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          viewBox="0 0 24 24"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path d="M5 12h14" />
-                          <path d="M12 5v14" />
-                        </svg>
-                        Add event
-                      </ContextMenuItem>
-                    )}
-                    {hasMoreEvents && onShowAllEvents && (
-                      <>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem
-                          onClick={() => {
-                            onShowAllEvents(day.getTime());
-                          }}
-                        >
-                          <svg
-                            className="mr-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path d="M4 6h16" />
-                            <path d="M4 12h16" />
-                            <path d="M4 18h16" />
-                          </svg>
-                          View all events ({dayEvents.length})
-                        </ContextMenuItem>
-                      </>
-                    )}
-                  </ContextMenuContent>
+                  <DateContextMenu
+                    eventCount={hasMoreEvents ? dayEvents.length : undefined}
+                    timestamp={day.getTime()}
+                    onAddEvent={onAddEvent}
+                    onShowAllEvents={onShowAllEvents}
+                  />
                 </ContextMenu>
               );
             })}

@@ -21,6 +21,7 @@ import {
   Printer,
   ArrowLeft,
 } from 'lucide-react';
+import { Letter } from 'react-letter';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -34,8 +35,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-
-import { SecureEmailRenderer } from './SecureEmailRenderer';
 
 import type { EmailMessage, EmailAttachment } from '../types/Email.types';
 
@@ -76,6 +75,26 @@ function formatFileSize(bytes: number): string {
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+const PLACEHOLDER_IMAGE =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect width="100" height="100" fill="%23f0f0f0"/%3E%3Ctext x="50" y="50" font-size="12" text-anchor="middle" dy=".3em" fill="%23999"%3EImage blocked%3C/text%3E%3C/svg%3E';
+
+const rewriteExternalResource = (url: string): string => {
+  if (!url) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return PLACEHOLDER_IMAGE;
+    }
+  } catch {
+    return url;
+  }
+
+  return url;
+};
 
 function AttachmentItem({
   attachment,
@@ -278,12 +297,17 @@ export function MessageView({
           <Separator />
 
           {/* Email body */}
-          <SecureEmailRenderer
-            blockExternalImages={!showExternalImages}
-            className="prose prose-sm dark:prose-invert max-w-none"
-            html={message.htmlBody ?? ''}
-            textBody={message.textBody}
-          />
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <Letter
+              allowedSchemas={['http', 'https', 'mailto', 'cid', 'data']}
+              html={message.htmlBody ?? ''}
+              {...(showExternalImages && rewriteExternalResource
+                ? { rewriteExternalResources: rewriteExternalResource }
+                : {})}
+              text={message.textBody ?? ''}
+              useIframe={false}
+            />
+          </div>
         </div>
       </div>
     </div>

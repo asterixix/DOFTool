@@ -18,6 +18,7 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { trackModuleAction } from '@/hooks/useAnalytics';
 import { cn } from '@/lib/utils';
 
 import { getViewTitle } from '../utils/dateHelpers';
@@ -216,7 +217,10 @@ export function CalendarHeader({
               className="h-7 px-3 text-xs"
               size="sm"
               variant={currentView === option.value ? 'secondary' : 'ghost'}
-              onClick={() => onViewChange(option.value)}
+              onClick={() => {
+                trackModuleAction('calendar', 'view_changed', { view: option.value });
+                onViewChange(option.value);
+              }}
             >
               {option.label}
             </Button>

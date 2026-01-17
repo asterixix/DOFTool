@@ -7,6 +7,7 @@ import { LoadingScreen } from '@/shared/components/LoadingScreen';
 import { logToDebug } from '@/shared/utils/debugLogger';
 import { useSettingsStore } from '@/stores/settings.store';
 
+import { PageTracker } from './components/PageTracker';
 import { AppLayout } from './layouts/AppLayout';
 
 // Lazy load feature modules
@@ -119,6 +120,7 @@ export function Router(): JSX.Element {
     // #endregion
     return (
       <Suspense fallback={<LoadingScreen />}>
+        <PageTracker />
         <Routes>
           <Route element={<WelcomePage />} path="/*" />
         </Routes>
@@ -136,6 +138,7 @@ export function Router(): JSX.Element {
 
   return (
     <Suspense fallback={<LoadingScreen />}>
+      <PageTracker />
       <Routes>
         <Route element={<AppLayout />} path="/">
           <Route index element={<Navigate replace to="/calendar" />} />

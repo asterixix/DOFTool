@@ -4,12 +4,15 @@
 
 import { useEffect, useState } from 'react';
 
+import { AnimatePresence, motion } from 'framer-motion';
 import { List, Plus } from 'lucide-react';
 import { Routes, Route } from 'react-router-dom';
 
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { trackModuleAction } from '@/hooks/useAnalytics';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useFamily } from '@/modules/family/hooks/useFamily';
 import { ErrorBanner } from '@/shared/components';
 
@@ -30,6 +33,7 @@ function TasksPage(): JSX.Element {
   const [sidebarCreateListTrigger, setSidebarCreateListTrigger] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const shouldReduceMotion = useReducedMotion();
 
   // Helper function to validate TaskListColor
   const validateTaskListColor = (color: string): TaskListColor => {
@@ -127,6 +131,7 @@ function TasksPage(): JSX.Element {
 
   // Handle task completion toggle
   const handleTaskComplete = async (task: Task, completed: boolean): Promise<void> => {
+    trackModuleAction('tasks', 'task_completed', { completed, hasDueDate: !!task.dueDate });
     await completeTask(task.id, completed);
   };
 
@@ -148,6 +153,7 @@ function TasksPage(): JSX.Element {
 
   // Handle creating new task list
   const handleCreateList = async (name: string, color: TaskListColor): Promise<void> => {
+    trackModuleAction('tasks', 'task_list_created', { color, visibility: 'family' });
     await createTaskList({
       name,
       color,
@@ -160,6 +166,12 @@ function TasksPage(): JSX.Element {
   // Handle saving task
   const handleSaveTask = async (data: TaskFormData): Promise<void> => {
     if (data.id) {
+      trackModuleAction('tasks', 'task_updated', {
+        hasDueDate: !!data.dueDate,
+        hasSubtasks: (data.subtasks?.length ?? 0) > 0,
+        hasLabels: (data.labels?.length ?? 0) > 0,
+        status: data.status,
+      });
       // Update existing task
       await updateTask({
         id: data.id,
@@ -201,6 +213,12 @@ function TasksPage(): JSX.Element {
         ...(data.position !== undefined && { position: data.position }),
       });
     } else {
+      trackModuleAction('tasks', 'task_created', {
+        hasDueDate: !!data.dueDate,
+        hasSubtasks: (data.subtasks?.length ?? 0) > 0,
+        hasLabels: (data.labels?.length ?? 0) > 0,
+        status: data.status,
+      });
       // Create new task
       await createTask({
         taskListId: data.taskListId,
@@ -247,6 +265,7 @@ function TasksPage(): JSX.Element {
 
   // Handle deleting task
   const handleDeleteTask = async (taskId: string): Promise<void> => {
+    trackModuleAction('tasks', 'task_deleted');
     await deleteTask(taskId);
     closeTaskEditor();
   };
@@ -308,6 +327,13 @@ function TasksPage(): JSX.Element {
     onCloseDialog: handleCloseDialog,
   });
 
+  const viewTransition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
+  const viewVariants = {
+    initial: shouldReduceMotion ? {} : { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    exit: shouldReduceMotion ? {} : { opacity: 0, y: -10 },
+  };
+
   // Render the current view
   const renderView = (): JSX.Element => {
     const tasksToDisplay = filteredTasks;
@@ -347,7 +373,12 @@ function TasksPage(): JSX.Element {
   };
 
   return (
-    <div className="flex h-full flex-1 flex-col gap-4 p-4">
+    <motion.div
+      animate={{ opacity: 1 }}
+      className="flex min-h-full flex-1 flex-col gap-4 p-4"
+      initial={{ opacity: 0 }}
+      transition={viewTransition}
+    >
       {/* Error display */}
       <ErrorBanner error={error} onDismiss={clearError} />
 
@@ -395,7 +426,10 @@ function TasksPage(): JSX.Element {
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
               }`}
               title="List view (L)"
-              onClick={() => setView('list')}
+              onClick={() => {
+                trackModuleAction('tasks', 'view_changed', { view: 'list' });
+                setView('list');
+              }}
             >
               List
             </button>
@@ -406,7 +440,10 @@ function TasksPage(): JSX.Element {
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
               }`}
               title="Board view (B)"
-              onClick={() => setView('board')}
+              onClick={() => {
+                trackModuleAction('tasks', 'view_changed', { view: 'board' });
+                setView('board');
+              }}
             >
               Board
             </button>
@@ -454,7 +491,19 @@ function TasksPage(): JSX.Element {
         )}
 
         {/* Tasks view */}
-        <div className="min-h-0 flex-1">{renderView()}</div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentView}
+            animate="animate"
+            className="min-h-0 flex-1"
+            exit="exit"
+            initial="initial"
+            transition={viewTransition}
+            variants={viewVariants}
+          >
+            {renderView()}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Task editor modal */}
@@ -498,7 +547,7 @@ function TasksPage(): JSX.Element {
         taskList={importExportList}
         onClose={closeImportExportDialog}
       />
-    </div>
+    </motion.div>
   );
 }
 
