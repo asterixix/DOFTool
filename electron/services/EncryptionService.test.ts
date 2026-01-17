@@ -2,6 +2,7 @@
  * Integration tests for EncryptionService
  */
 import { describe, it, expect, beforeAll } from 'vitest';
+
 import { EncryptionService } from './EncryptionService';
 
 describe('EncryptionService', () => {

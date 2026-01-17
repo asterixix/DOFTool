@@ -1,8 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["@playwright/test", "node"]
+    "types": ["vitest/globals", "@playwright/test", "node"]
   },
-  "include": ["tests/**/*"],
+  "include": [
+    "tests/**/*",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "electron/**/*.test.ts"
+  ],
   "exclude": ["node_modules", "dist", "release"]
 }

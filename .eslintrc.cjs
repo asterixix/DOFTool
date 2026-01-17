@@ -185,6 +185,7 @@ module.exports = {
       parserOptions: {
         project: './tsconfig.test.json',
         tsconfigRootDir: __dirname,
+        noWarnOnMultipleProjects: true,
       },
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
@@ -200,6 +201,7 @@ module.exports = {
       parserOptions: {
         project: './tsconfig.test.json',
         tsconfigRootDir: __dirname,
+        noWarnOnMultipleProjects: true,
       },
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { cn, generateId, sleep, debounce, formatDate, formatTime } from './utils';
 
 describe('utils', () => {
@@ -69,7 +70,7 @@ describe('utils', () => {
 
     it('should resolve after specified time', async () => {
       const callback = vi.fn();
-      sleep(100).then(callback);
+      void sleep(100).then(callback);
 
       expect(callback).not.toHaveBeenCalled();
 

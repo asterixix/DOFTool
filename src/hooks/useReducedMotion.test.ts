@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { useReducedMotion } from './useReducedMotion';
 
 vi.mock('framer-motion', () => ({
@@ -7,8 +8,9 @@ vi.mock('framer-motion', () => ({
 }));
 
 vi.mock('@/stores/settings.store', () => ({
-  useSettingsStore: vi.fn((selector) =>
-    selector({ appearance: { reducedMotion: false } })
+  useSettingsStore: vi.fn(
+    (selector: (state: { appearance: { reducedMotion: boolean } }) => boolean): boolean =>
+      selector({ appearance: { reducedMotion: false } })
   ),
 }));
 

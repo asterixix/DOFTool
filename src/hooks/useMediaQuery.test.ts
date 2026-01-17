@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { useMediaQuery } from './useMediaQuery';
 
 describe('useMediaQuery', () => {
@@ -12,9 +13,13 @@ describe('useMediaQuery', () => {
       matches: false,
       media: query,
       onchange: null,
-      addListener: vi.fn((cb) => listeners.push(cb)),
+      addListener: vi.fn((cb: (e: MediaQueryListEvent) => void) => {
+        listeners.push(cb);
+      }),
       removeListener: vi.fn(),
-      addEventListener: vi.fn((_, cb) => listeners.push(cb)),
+      addEventListener: vi.fn((_: string, cb: (e: MediaQueryListEvent) => void) => {
+        listeners.push(cb);
+      }),
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }));
