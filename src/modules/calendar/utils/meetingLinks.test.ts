@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { detectMeetingLink, isLikelyAddress } from './meetingLinks';
 
 describe('meetingLinks', () => {
@@ -30,9 +31,7 @@ describe('meetingLinks', () => {
     });
 
     it('should detect Microsoft Teams meeting links', () => {
-      const result = detectMeetingLink(
-        'https://teams.microsoft.com/l/meetup-join/19%3ameeting'
-      );
+      const result = detectMeetingLink('https://teams.microsoft.com/l/meetup-join/19%3ameeting');
       expect(result).not.toBeNull();
       expect(result?.type).toBe('teams');
       expect(result?.displayName).toBe('Microsoft Teams');

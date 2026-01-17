@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { track, trackScreen, trackAction, updateAnalyticsState } from './analytics';
 
 vi.mock('@/stores/settings.store', () => ({

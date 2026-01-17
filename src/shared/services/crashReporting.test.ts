@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { reportCrash, createErrorDetails } from './crashReporting';
 
 vi.mock('@/stores/settings.store', () => ({

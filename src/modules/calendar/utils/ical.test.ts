@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { parseICal, generateICal, icalEventToCalendarEvent } from './ical';
 
 import type { Calendar, CalendarEvent } from '../types/Calendar.types';

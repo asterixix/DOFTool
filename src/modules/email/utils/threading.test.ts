@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import {
   extractThreadId,
   parseReferences,
@@ -389,7 +390,13 @@ describe('threading', () => {
         createMockMessage({
           messageId: '<root@example.com>',
           attachments: [
-            { id: '1', filename: 'file.pdf', contentType: 'application/pdf', size: 100, inline: false },
+            {
+              id: '1',
+              filename: 'file.pdf',
+              contentType: 'application/pdf',
+              size: 100,
+              inline: false,
+            },
           ],
         }),
       ];

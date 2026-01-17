@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  parseRRule,
-  toRRuleString,
-  expandRecurringEvent,
-  describeRecurrence,
-} from './recurrence';
+
+import { parseRRule, toRRuleString, expandRecurringEvent, describeRecurrence } from './recurrence';
 
 import type { CalendarEvent, RecurrenceRule } from '../types/Calendar.types';
 

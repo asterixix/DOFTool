@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { TUTORIAL_CONTENT, getTutorialProgress } from './tutorialContent';
 
 describe('tutorialContent', () => {

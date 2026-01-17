@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import {
   sanitizeHtml,
   htmlToPlainText,
@@ -200,7 +201,8 @@ describe('sanitize', () => {
     });
 
     it('should restore original image sources', () => {
-      const blocked = '<img src="data:image/svg+xml,..." data-original-src="https://example.com/image.jpg">';
+      const blocked =
+        '<img src="data:image/svg+xml,..." data-original-src="https://example.com/image.jpg">';
       const result = unblockExternalImages(blocked);
       expect(result).toContain('src="https://example.com/image.jpg"');
     });
