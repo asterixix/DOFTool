@@ -73,6 +73,19 @@ jobs:
         run: npm run build
 
       - name: Build Electron (verify packaging works)
-        run: npx electron-builder --dir
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            npx electron-builder --linux --dir
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            npx electron-builder --win --dir
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            npx electron-builder --mac --dir
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+
+      - name: List build output
+        run: ls -la dist-release/
+        shell: bash
+        continue-on-error: true
