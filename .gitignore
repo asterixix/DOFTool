@@ -10,7 +10,6 @@ release/
 out/
 build/
 test-results/
-scripts/
 playwright-report/
 playwright/
 
