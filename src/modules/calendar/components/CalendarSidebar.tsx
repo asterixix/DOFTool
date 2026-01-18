@@ -2,7 +2,7 @@
  * CalendarSidebar - Calendar list and mini calendar
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,15 +46,28 @@ export function CalendarSidebar({
   const [newCalendarName, setNewCalendarName] = useState('');
   const [newCalendarColor, setNewCalendarColor] = useState<CalendarColor>('blue');
 
+  // Reset form state when opening the create form
+  useEffect(() => {
+    if (showCreateForm) {
+      setNewCalendarName('');
+      setNewCalendarColor('blue');
+    }
+  }, [showCreateForm]);
+
   const handleCreate = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!newCalendarName.trim()) {
+    if (!newCalendarName.trim() || isCreating) {
       return;
     }
 
-    await onCreateCalendar(newCalendarName.trim(), newCalendarColor);
-    setNewCalendarName('');
-    setShowCreateForm(false);
+    try {
+      await onCreateCalendar(newCalendarName.trim(), newCalendarColor);
+      setNewCalendarName('');
+      setShowCreateForm(false);
+    } catch (error) {
+      // Error handling is done in the parent component
+      console.error('Failed to create calendar:', error);
+    }
   };
 
   const colorOptions: CalendarColor[] = [
@@ -110,6 +123,7 @@ export function CalendarSidebar({
           {/* Create form */}
           {showCreateForm && (
             <form
+              key="calendar-create-form"
               className="mb-3 space-y-2 rounded-md border p-2"
               onSubmit={(e) => void handleCreate(e)}
             >
@@ -155,7 +169,10 @@ export function CalendarSidebar({
                   size="sm"
                   type="button"
                   variant="ghost"
-                  onClick={() => setShowCreateForm(false)}
+                  onClick={() => {
+                    setNewCalendarName('');
+                    setShowCreateForm(false);
+                  }}
                 >
                   Cancel
                 </Button>

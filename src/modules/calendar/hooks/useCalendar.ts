@@ -723,6 +723,16 @@ export function useCalendar(): UseCalendarReturn {
 
         const { id, updateScope: _updateScope, ...data } = input;
 
+        // eslint-disable-next-line no-console
+        console.log('Updating event with ID:', id);
+        // eslint-disable-next-line no-console
+        console.log('Update data:', data);
+
+        // Validate event ID
+        if (!id) {
+          throw new Error('Event ID is required for update');
+        }
+
         // Build update data with only defined properties
         const updateData: Partial<CreateEventData> = {};
 

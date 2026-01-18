@@ -41,14 +41,14 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux",
-    "build:all": "npm run build && electron-builder --win --mac --linux",
-    "release": "npm run build && electron-builder --win --mac --linux --publish always",
-    "release:win": "npm run build && electron-builder --win --publish always",
-    "release:mac": "npm run build && electron-builder --mac --publish always",
-    "release:linux": "npm run build && electron-builder --linux --publish always",
+    "build:win": "npm run icons && npm run build && electron-builder --win",
+    "build:mac": "npm run icons && npm run build && electron-builder --mac",
+    "build:linux": "npm run icons && npm run build && electron-builder --linux",
+    "build:all": "npm run icons && npm run build && electron-builder --win --mac --linux",
+    "release": "npm run icons && npm run build && electron-builder --win --mac --linux --publish always",
+    "release:win": "npm run icons && npm run build && electron-builder --win --publish always",
+    "release:mac": "npm run icons && npm run build && electron-builder --mac --publish always",
+    "release:linux": "npm run icons && npm run build && electron-builder --linux --publish always",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -203,7 +203,7 @@
         "nsis",
         "zip"
       ],
-      "icon": "build/icon.ico",
+      "icon": "public/icon.ico",
       "sign": null,
       "certificateFile": null,
       "certificatePassword": "",
@@ -216,9 +216,40 @@
         "dmg",
         "zip"
       ],
-      "icon": "build/icon.icns",
+      "icon": "public/icon.icns",
       "category": "public.app-category.productivity",
-      "identity": null
+      "identity": null,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "public/entitlements.mac.plist",
+      "entitlementsInherit": "public/entitlements.mac.plist",
+      "extendInfo": {
+        "NSHumanReadableCopyright": "Copyright © 2024 Artur Sendyka",
+        "CFBundleShortVersionString": "1.0.0",
+        "LSApplicationCategoryType": "public.app-category.productivity",
+        "NSLocalNetworkUsageDescription": "DOFTool uses local network to sync data between family devices.",
+        "NSBonjourServices": [
+          "_doftool._tcp"
+        ]
+      }
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     },
     "linux": {
       "target": [
@@ -227,7 +258,36 @@
         "rpm"
       ],
       "icon": "build/icons",
-      "category": "Office"
+      "category": "Office",
+      "synopsis": "Family collaboration tool for Calendar, Tasks, and Email",
+      "description": "Decentralized, offline-first, end-to-end encrypted family collaboration for Calendar, Tasks, and Email with P2P synchronization.",
+      "maintainer": "Artur Sendyka <artur@sendyka.dev>",
+      "vendor": "DOFTool",
+      "desktop": {
+        "Name": "DOFTool",
+        "Comment": "Family collaboration for Calendar, Tasks, and Email",
+        "Categories": "Office;Calendar;ProjectManagement;Email;",
+        "Keywords": "family;calendar;tasks;email;sync;offline;encrypted;",
+        "StartupNotify": "true",
+        "StartupWMClass": "doftool"
+      },
+      "executableArgs": [
+        "--no-sandbox"
+      ]
+    },
+    "deb": {
+      "priority": "optional",
+      "compression": "xz",
+      "depends": [
+        "libnotify4",
+        "libsecret-1-0"
+      ]
+    },
+    "rpm": {
+      "compression": "xz"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.AppImage"
     },
     "nsis": {
       "oneClick": false,

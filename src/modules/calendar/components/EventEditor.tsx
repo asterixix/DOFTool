@@ -22,6 +22,7 @@ import {
   type RecurrenceRule,
   type EventReminder,
   type EventCategory,
+  type EventAttendee,
 } from '../types/Calendar.types';
 import { describeRecurrence } from '../utils/recurrence';
 import {
@@ -58,6 +59,7 @@ export interface EventFormData {
   category: EventCategory | undefined;
   color: CalendarColor | undefined;
   reminders: EventReminder[];
+  attendees: EventAttendee[] | undefined;
 }
 
 export function EventEditor({
@@ -201,6 +203,7 @@ export function EventEditor({
       category,
       color,
       reminders: reminders.filter((r) => r.enabled !== false),
+      attendees: event?.attendees,
     };
 
     await onSave(formData);

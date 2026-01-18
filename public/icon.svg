@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with warm paper feel -->
+  <circle cx="256" cy="256" r="250" fill="#FFF8F0" stroke="#E5E7EB" stroke-width="4"/>
+  
+  <!-- House outline -->
+  <path d="M256 120L380 210V380H332V260H180V380H132V210L256 120Z" fill="none" stroke="#0F766E" stroke-width="8" stroke-linejoin="round"/>
+  
+  <!-- Roof -->
+  <path d="M256 120L380 210H132L256 120Z" fill="#0F766E"/>
+  
+  <!-- Connection nodes (decentralized network) -->
+  <!-- Top-left node -->
+  <circle cx="150" cy="150" r="12" fill="#EA580C"/>
+  <line x1="150" y1="150" x2="256" y2="120" stroke="#EA580C" stroke-width="3" opacity="0.6"/>
+  
+  <!-- Top-right node -->
+  <circle cx="362" cy="150" r="12" fill="#EA580C"/>
+  <line x1="362" y1="150" x2="256" y2="120" stroke="#EA580C" stroke-width="3" opacity="0.6"/>
+  
+  <!-- Bottom-left node -->
+  <circle cx="150" cy="362" r="12" fill="#EA580C"/>
+  <line x1="150" y1="362" x2="180" y2="380" stroke="#EA580C" stroke-width="3" opacity="0.6"/>
+  
+  <!-- Bottom-right node -->
+  <circle cx="362" cy="362" r="12" fill="#EA580C"/>
+  <line x1="362" y1="362" x2="332" y2="380" stroke="#EA580C" stroke-width="3" opacity="0.6"/>
+  
+  <!-- Center door -->
+  <rect x="230" y="300" width="52" height="80" fill="#0F766E"/>
+  <circle cx="268" cy="340" r="3" fill="#FFF8F0"/>
+</svg>

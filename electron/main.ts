@@ -296,10 +296,10 @@ function applyAutoLaunchSetting(): void {
 function getTrayIconPath(): string {
   const appPath = safeApp().getAppPath();
   if (process.platform === 'win32') {
-    return path.join(appPath, 'build', 'icon.ico');
+    return path.join(appPath, 'public', 'icon.ico');
   }
   if (process.platform === 'darwin') {
-    return path.join(appPath, 'build', 'icon.icns');
+    return path.join(appPath, 'public', 'icon.icns');
   }
   return path.join(appPath, 'build', 'favicon195.png');
 }
@@ -2165,7 +2165,11 @@ if (typeof ipcMain !== 'undefined') {
       const existing = eventsMap.get(eventId);
 
       if (!existing) {
-        throw new Error('Event not found');
+        // Log available event IDs for debugging
+        const availableIds: string[] = [];
+        eventsMap.forEach((_, id) => availableIds.push(id));
+        console.error(`Event not found: ${eventId}. Available IDs:`, availableIds);
+        throw new Error(`Event not found: ${eventId}`);
       }
 
       const deviceId = (await getStorageService().get('device:id')) ?? 'unknown';
