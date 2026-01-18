@@ -301,7 +301,7 @@ function getTrayIconPath(): string {
   if (process.platform === 'darwin') {
     return path.join(appPath, 'public', 'icon.icns');
   }
-  return path.join(appPath, 'build', 'favicon195.png');
+  return path.join(appPath, 'public', 'favicon195.png');
 }
 
 function createTray(): void {

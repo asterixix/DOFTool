@@ -257,7 +257,7 @@
         "deb",
         "rpm"
       ],
-      "icon": "build/icons",
+      "icon": "public",
       "category": "Office",
       "synopsis": "Family collaboration tool for Calendar, Tasks, and Email",
       "description": "Decentralized, offline-first, end-to-end encrypted family collaboration for Calendar, Tasks, and Email with P2P synchronization.",

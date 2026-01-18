@@ -3,17 +3,11 @@ const fs = require('fs');
 const icongen = require('icon-gen');
 
 const publicDir = path.join(__dirname, '../public');
-const buildDir = path.join(__dirname, '../build');
-const iconsDir = path.join(buildDir, 'icons');
 const sourceIcon = path.join(publicDir, 'icon.svg');
 
 // Icon sizes needed for Linux
 const LINUX_ICON_SIZES = [16, 32, 48, 64, 72, 96, 128, 256, 512];
 
-// Ensure output directories exist
-if (!fs.existsSync(iconsDir)) {
-  fs.mkdirSync(iconsDir, { recursive: true });
-}
 
 // Check if source icon exists
 if (!fs.existsSync(sourceIcon)) {
@@ -55,7 +49,7 @@ async function generateIcons() {
     // Generate Linux PNG icons with proper naming
     console.log('🐧 Generating Linux PNG icons...');
     // Generate all sizes at once using a temporary directory
-    const tempDir = path.join(iconsDir, 'temp');
+    const tempDir = path.join(publicDir, 'temp');
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -72,10 +66,9 @@ async function generateIcons() {
     });
     
     // Rename and move files to correct location
-    const tempFiles = fs.readdirSync(tempDir);
     for (const size of LINUX_ICON_SIZES) {
       const sourceFile = path.join(tempDir, `icon${size}.png`);
-      const targetFile = path.join(iconsDir, `${size}x${size}.png`);
+      const targetFile = path.join(publicDir, `${size}x${size}.png`);
       
       if (fs.existsSync(sourceFile)) {
         fs.renameSync(sourceFile, targetFile);
@@ -88,9 +81,8 @@ async function generateIcons() {
     
         
     console.log('✅ All icons generated successfully!');
-    console.log('   📁 Output directories:');
-    console.log(`      - ${publicDir} (icon.icns, icon.ico, favicon.ico)`);
-    console.log(`      - ${iconsDir} (Linux PNG icons)`);
+    console.log('   📁 Output directory:');
+    console.log(`      - ${publicDir} (all platform icons)`);
   } catch (err) {
     console.error('❌ Error generating icons:', err);
     process.exit(1);
