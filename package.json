@@ -1,6 +1,6 @@
 {
   "name": "doftool",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Decentralized, offline-first, end-to-end encrypted family collaboration for Calendar, Tasks, and Email",
   "main": "dist/electron/main.js",
   "author": {
