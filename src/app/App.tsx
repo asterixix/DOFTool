@@ -29,7 +29,7 @@ export function App(): JSX.Element {
   useCompactMode();
 
   // Get admin status for join request dialog
-  const isAdmin = useFamilyStore((state) => state.isAdmin);
+  const isAdmin = useFamilyStore((state) => state.isAdmin());
 
   useEffect(() => {
     // Analytics is initialized in the main process (electron/main.ts)
@@ -116,7 +116,7 @@ export function App(): JSX.Element {
         <ThemeProvider defaultTheme="system" storageKey={BRAND.themeStorageKey}>
           <HashRouter>
             <Router />
-            <JoinRequestDialog isAdmin={isAdmin()} />
+            <JoinRequestDialog isAdmin={isAdmin} />
           </HashRouter>
         </ThemeProvider>
       </QueryClientProvider>

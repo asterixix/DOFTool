@@ -1780,8 +1780,10 @@ if (typeof ipcMain !== 'undefined') {
     return getEncryptionService().hashString(text);
   });
 
-  ipcMain.handle('encryption:generateToken', (_event, length?: number) => {
-    return getEncryptionService().generateToken(length);
+  ipcMain.handle('encryption:generateToken', async (_event, length?: number) => {
+    const service = getEncryptionService();
+    await service.initialize();
+    return service.generateToken(length);
   });
 
   // Yjs service handlers
@@ -1953,13 +1955,15 @@ if (typeof ipcMain !== 'undefined') {
     return familyState;
   });
 
-  ipcMain.handle('family:invite', (_event, role: PermissionRole) => {
+  ipcMain.handle('family:invite', async (_event, role: PermissionRole) => {
     if (!['admin', 'member', 'viewer'].includes(role)) {
       throw new Error('Invalid role for invitation');
     }
 
     const { invitationsMap } = getFamilyCollections();
-    const token = getEncryptionService().generateToken(24);
+    const encryption = getEncryptionService();
+    await encryption.initialize();
+    const token = encryption.generateToken(24);
     const invitation: InvitationInfo = {
       token,
       role,
@@ -2098,7 +2102,9 @@ if (typeof ipcMain !== 'undefined') {
       if (approval) {
         // Create an invitation token for the approved device
         const { invitationsMap } = getFamilyCollections();
-        const token = getEncryptionService().generateToken(24);
+        const encryption = getEncryptionService();
+        await encryption.initialize();
+        const token = encryption.generateToken(24);
         const invitation: InvitationInfo = {
           token,
           role,

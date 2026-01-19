@@ -69,8 +69,8 @@ export function useFamily(): UseFamilyReturn {
   const setJoining = useFamilyStore((state) => state.setJoining);
   const setError = useFamilyStore((state) => state.setError);
   const setPendingInvite = useFamilyStore((state) => state.setPendingInvite);
-  const hasFamily = useFamilyStore((state) => state.hasFamily);
-  const isAdmin = useFamilyStore((state) => state.isAdmin);
+  const hasFamily = useFamilyStore((state) => state.hasFamily());
+  const isAdmin = useFamilyStore((state) => state.isAdmin());
   const getCurrentDevice = useFamilyStore((state) => state.getCurrentDevice);
 
   // Track if initial load has happened
@@ -292,8 +292,8 @@ export function useFamily(): UseFamilyReturn {
     pendingInvite,
 
     // Computed
-    hasFamily: hasFamily(),
-    isAdmin: isAdmin(),
+    hasFamily,
+    isAdmin,
     currentDevice: getCurrentDevice(),
 
     // Actions

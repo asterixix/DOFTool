@@ -4,7 +4,19 @@
 
 import * as crypto from 'crypto';
 
-import * as sodium from 'libsodium-wrappers';
+import * as sodiumModule from 'libsodium-wrappers';
+
+type SodiumApi = typeof sodiumModule;
+
+const sodiumDefault = (sodiumModule as unknown as { default?: SodiumApi }).default;
+const sodiumNamespace: SodiumApi = sodiumModule;
+
+function hasRandomBytesBuf(api: SodiumApi): boolean {
+  return typeof (api as unknown as { randombytes_buf?: unknown }).randombytes_buf === 'function';
+}
+
+const sodium: SodiumApi =
+  sodiumDefault && hasRandomBytesBuf(sodiumDefault) ? sodiumDefault : sodiumNamespace;
 
 export interface EncryptionKey {
   /** Raw key bytes (32 bytes for XChaCha20-Poly1305) */
@@ -226,6 +238,7 @@ export class EncryptionService {
   secureZero(data: Uint8Array): void {
     this.ensureInitialized();
     if (data && data.length > 0) {
+      data.fill(0);
       sodium.memzero(data);
     }
   }
@@ -246,7 +259,7 @@ export class EncryptionService {
   generateSecureId(byteLength = 16): string {
     this.ensureInitialized();
     const bytes = sodium.randombytes_buf(byteLength);
-    return sodium.to_base64(bytes, sodium.base64_variants.URLSAFE_NO_PADDING);
+    return Buffer.from(bytes).toString('base64url');
   }
 
   /**

@@ -23,19 +23,26 @@ vi.mock('libsodium-wrappers', () => {
         }
         return arr;
       },
-      crypto_secretbox_easy: (message: Uint8Array, _nonce: Uint8Array, _key: Uint8Array) => {
-        // Simple mock encryption: prepend 16-byte auth tag to message
+      crypto_secretbox_easy: (message: Uint8Array, nonce: Uint8Array, _key: Uint8Array) => {
+        // Simple mock encryption:
+        // - prepend 16-byte auth tag
+        // - XOR message with nonce to ensure ciphertext differs for different nonces
         const result = new Uint8Array(message.length + 16);
-        result.set(message, 16);
+        for (let i = 0; i < message.length; i++) {
+          result[16 + i] = message[i] ^ nonce[i % nonce.length];
+        }
         return result;
       },
-      crypto_secretbox_open_easy: (
-        ciphertext: Uint8Array,
-        _nonce: Uint8Array,
-        _key: Uint8Array
-      ) => {
-        // Simple mock decryption: remove the 16-byte auth tag prefix
-        return ciphertext.slice(16);
+      crypto_secretbox_open_easy: (ciphertext: Uint8Array, nonce: Uint8Array, _key: Uint8Array) => {
+        // Simple mock decryption:
+        // - remove the 16-byte auth tag prefix
+        // - XOR with nonce to reverse the encryption step
+        const body = ciphertext.slice(16);
+        const result = new Uint8Array(body.length);
+        for (let i = 0; i < body.length; i++) {
+          result[i] = body[i] ^ nonce[i % nonce.length];
+        }
+        return result;
       },
       crypto_pwhash: (
         keyLength: number,
@@ -61,6 +68,16 @@ vi.mock('libsodium-wrappers', () => {
       },
       memzero: () => {
         // No-op for tests
+      },
+      memcmp: (a: Uint8Array, b: Uint8Array) => {
+        if (a.length !== b.length) {
+          return false;
+        }
+        let diff = 0;
+        for (let i = 0; i < a.length; i++) {
+          diff |= a[i] ^ b[i];
+        }
+        return diff === 0;
       },
     },
   };
