@@ -1364,6 +1364,22 @@ function getFamilyId(): string {
   return family.id;
 }
 
+async function ensureDiscoveryService(): Promise<DiscoveryService> {
+  if (discoveryService) {
+    return discoveryService;
+  }
+
+  const storage = getStorageService();
+  const storedDeviceId = await storage.get('device:id');
+  const deviceId = storedDeviceId ?? (await ensureDevice()).id;
+
+  discoveryService = new DiscoveryService();
+  discoveryService.initializeBasic(deviceId);
+  console.log('[DiscoveryService] Service initialized (lazy)');
+
+  return discoveryService;
+}
+
 // Helper function to convert encryption type to secure boolean
 // For nodemailer/imapflow: secure=true means SSL/TLS directly (port 465),
 // secure=false means STARTTLS (port 587)
@@ -1891,19 +1907,15 @@ if (typeof ipcMain !== 'undefined') {
   // Family Discovery IPC Handlers (mDNS-based local network discovery)
   // ============================================================================
 
-  ipcMain.handle('discovery:startDiscovering', () => {
-    if (!discoveryService) {
-      throw new Error('Family discovery service not initialized');
-    }
-    discoveryService.startDiscovering();
+  ipcMain.handle('discovery:startDiscovering', async () => {
+    const service = await ensureDiscoveryService();
+    service.startDiscovering();
     return { success: true };
   });
 
-  ipcMain.handle('discovery:stopDiscovering', () => {
-    if (!discoveryService) {
-      return { success: false };
-    }
-    discoveryService.stopDiscovering();
+  ipcMain.handle('discovery:stopDiscovering', async () => {
+    const service = await ensureDiscoveryService();
+    service.stopDiscovering();
     return { success: true };
   });
 
@@ -1915,11 +1927,8 @@ if (typeof ipcMain !== 'undefined') {
   });
 
   ipcMain.handle('discovery:requestJoin', async (_event, familyId: string) => {
-    if (!discoveryService) {
-      throw new Error('Family discovery service not initialized');
-    }
-
-    const request = discoveryService.createJoinRequest(familyId);
+    const service = await ensureDiscoveryService();
+    const request = service.createJoinRequest(familyId);
 
     // Send the join request to the admin device via WebRTC signaling
     // For now, we'll use a simple approach where the request is stored
@@ -1946,17 +1955,15 @@ if (typeof ipcMain !== 'undefined') {
 
   ipcMain.handle(
     'discovery:approveJoinRequest',
-    (_event, requestId: string, role: PermissionRole): JoinApproval | null => {
-      if (!discoveryService) {
-        throw new Error('Family discovery service not initialized');
-      }
+    async (_event, requestId: string, role: PermissionRole): Promise<JoinApproval | null> => {
+      const service = await ensureDiscoveryService();
 
       const familyState = getFamilyState();
       if (!familyState.family) {
         throw new Error('No family configured');
       }
 
-      const approval = discoveryService.approveJoinRequest(
+      const approval = service.approveJoinRequest(
         requestId,
         role,
         familyState.family.id,
@@ -1999,17 +2006,15 @@ if (typeof ipcMain !== 'undefined') {
     return rejected;
   });
 
-  ipcMain.handle('discovery:startPublishing', () => {
-    if (!discoveryService) {
-      throw new Error('Family discovery service not initialized');
-    }
+  ipcMain.handle('discovery:startPublishing', async () => {
+    const service = await ensureDiscoveryService();
 
     const familyState = getFamilyState();
     if (!familyState.family) {
       throw new Error('No family configured');
     }
 
-    discoveryService.startPublishing(familyState.family.id, familyState.family.name);
+    service.startPublishing(familyState.family.id, familyState.family.name);
     return { success: true };
   });
 
@@ -2024,12 +2029,10 @@ if (typeof ipcMain !== 'undefined') {
   // Listen for join requests from other devices (via WebRTC awareness)
   ipcMain.handle(
     'discovery:receiveJoinRequest',
-    (_event, deviceId: string, deviceName: string): JoinRequest => {
-      if (!discoveryService) {
-        throw new Error('Family discovery service not initialized');
-      }
+    async (_event, deviceId: string, deviceName: string): Promise<JoinRequest> => {
+      const service = await ensureDiscoveryService();
 
-      const request = discoveryService.receiveJoinRequest(deviceId, deviceName);
+      const request = service.receiveJoinRequest(deviceId, deviceName);
 
       // Notify renderer about the new join request
       if (mainWindow) {
