@@ -1454,19 +1454,56 @@ if (typeof ipcMain !== 'undefined') {
     try {
       console.log('[Reset] Starting full app data reset...');
 
-      // Close Yjs service to release any locks before deleting data
-      if (yjsService) {
-        await yjsService.close();
-        console.log('[Reset] Yjs service closed');
-
-        // Reopen Yjs service after deleting data
-        yjsService = new YjsService();
-        await yjsService.initialize();
-        console.log('[Reset] Yjs service reopened');
+      // 1. Stop sync service first
+      if (syncService) {
+        if (syncService.isActive()) {
+          syncService.stop();
+        }
+        syncService.destroy();
+        syncService = null;
+        console.log('[Reset] Sync service stopped and destroyed');
       }
 
-      // Delete database directories
-      const { rm } = await import('fs/promises');
+      // 2. Stop discovery service
+      if (discoveryService) {
+        discoveryService.stopPublishing();
+        discoveryService.stopDiscovering();
+        console.log('[Reset] Discovery service stopped');
+      }
+
+      // 3. Tear down services that depend on StorageService before closing it
+      if (reminderSchedulingService) {
+        reminderSchedulingService.dispose();
+        reminderSchedulingService = null;
+        console.log('[Reset] Reminder scheduling service disposed');
+      }
+
+      if (autoUpdaterService) {
+        autoUpdaterService = null;
+        console.log('[Reset] Auto-updater service reset');
+      }
+
+      if (notificationService) {
+        notificationService = null;
+        console.log('[Reset] Notification service reset');
+      }
+
+      // 4. Close Yjs service to release any locks before deleting data
+      if (yjsService) {
+        await yjsService.close();
+        yjsService = null;
+        console.log('[Reset] Yjs service closed');
+      }
+
+      // 5. Clear storage service data
+      if (storageService) {
+        await storageService.close();
+        storageService = null;
+        console.log('[Reset] Storage service closed');
+      }
+
+      // 6. Delete database directories
+      const { rm, mkdir } = await import('fs/promises');
       const userDataPath = app.getPath('userData');
 
       const dataDir = path.join(userDataPath, 'data');
@@ -1476,6 +1513,40 @@ if (typeof ipcMain !== 'undefined') {
       } catch (error) {
         console.warn('[Reset] Failed to delete data directory:', error);
       }
+
+      // 7. Recreate data directory structure before reinitializing services
+      try {
+        await mkdir(dataDir, { recursive: true });
+        await mkdir(path.join(dataDir, 'yjs'), { recursive: true });
+        console.log('[Reset] Data directories recreated');
+      } catch (error) {
+        console.warn('[Reset] Failed to recreate data directories:', error);
+      }
+
+      // 8. Reinitialize services with clean state
+      storageService = new StorageService();
+      await storageService.initialize();
+      console.log('[Reset] Storage service reinitialized');
+
+      notificationService = new NotificationService(storageService);
+      await notificationService.initialize();
+      console.log('[Reset] Notification service reinitialized');
+
+      reminderSchedulingService = new ReminderSchedulingService(
+        storageService,
+        notificationService
+      );
+      await reminderSchedulingService.initialize();
+      console.log('[Reset] Reminder scheduling service reinitialized');
+
+      const currentVersion = safeApp().getVersion();
+      autoUpdaterService = new AutoUpdaterService(notificationService, currentVersion);
+      autoUpdaterService.setElectronModules({ shell, app: safeApp() });
+      console.log('[Reset] Auto-updater service reinitialized');
+
+      yjsService = new YjsService();
+      await yjsService.initialize();
+      console.log('[Reset] Yjs service reinitialized');
 
       console.log('[Reset] All data cleared successfully');
       return { success: true };
@@ -1781,13 +1852,29 @@ if (typeof ipcMain !== 'undefined') {
   });
 
   ipcMain.handle('family:get', async () => {
-    const { devicesMap } = getFamilyCollections();
+    const { devicesMap, permissionsMap, familyMap } = getFamilyCollections();
     const device = await ensureDevice();
     const existing = devicesMap.get(device.id) as DeviceInfo | undefined;
     const mergedDevice: DeviceInfo = existing
       ? { ...existing, lastSeen: Date.now(), isCurrent: true }
       : device;
     devicesMap.set(device.id, mergedDevice);
+
+    // Ensure admin device has admin permission (safeguard for database setup/migration)
+    const family = familyMap.get('info') as FamilyInfo | undefined;
+    if (family?.adminDeviceId === device.id) {
+      const existingPermission = permissionsMap.get(device.id) as PermissionInfo | undefined;
+      if (existingPermission?.role !== 'admin') {
+        const adminPermission: PermissionInfo = {
+          memberId: device.id,
+          role: 'admin',
+          createdAt: existingPermission?.createdAt ?? Date.now(),
+        };
+        permissionsMap.set(device.id, adminPermission);
+        console.log('[Family] Ensured admin permission for admin device:', device.id);
+      }
+    }
+
     const familyState = getFamilyState();
 
     // If family exists but sync service isn't initialized, initialize it

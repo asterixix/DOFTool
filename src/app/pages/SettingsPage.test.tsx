@@ -140,7 +140,7 @@ describe('SettingsPage', () => {
 
   it('should render Reset Settings button', () => {
     render(<SettingsPage />);
-    expect(screen.getByRole('button', { name: /reset all settings/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /delete all data.*reset/i })).toBeDefined();
   });
 
   it('should switch to Appearance tab when clicked', async () => {

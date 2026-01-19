@@ -95,6 +95,13 @@ export class ReminderSchedulingService {
     }
   }
 
+  public dispose(): void {
+    this.reminderTimers.forEach((_timers, eventId) => {
+      this.clearEventReminders(eventId);
+    });
+    this.reminderTimers.clear();
+  }
+
   public scheduleEventReminders(event: CalendarEventForReminder): void {
     this.clearEventReminders(event.id);
 

@@ -30,6 +30,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 // Email Settings hidden for current build
 // import { EmailSettingsSection } from '@/modules/email/components/settings/EmailSettingsSection';
+import { useFamilyStore } from '@/modules/family/stores/family.store';
 import { SyncSettingsSection } from '@/modules/sync/components/SyncSettingsSection';
 import { BRAND } from '@/shared/brand';
 import { useSettingsStore } from '@/stores/settings.store';
@@ -256,6 +257,7 @@ export default function SettingsPage(): JSX.Element {
 
       // Reset the frontend stores
       fullReset();
+      useFamilyStore.getState().reset();
 
       // Clear localStorage
       localStorage.clear();
