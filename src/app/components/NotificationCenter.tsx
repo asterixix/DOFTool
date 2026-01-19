@@ -4,11 +4,12 @@
  * Shows recent notifications with filtering and actions.
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Bell, BellOff, Calendar, CheckSquare, Mail, Settings, Trash2, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -32,27 +33,95 @@ const moduleIcons: Record<NotificationModule, LucideIcon> = {
   system: Settings,
 };
 
+// Helper to get action text based on notification type
+function getActionText(item: NotificationHistoryItem): string | null {
+  const notificationType = item.data?.['type'] as string | undefined;
+
+  switch (item.module) {
+    case 'calendar':
+      if (notificationType === 'event_reminder') {
+        return 'View event';
+      }
+      if (notificationType === 'event_created') {
+        return 'View event';
+      }
+      if (notificationType === 'event_updated') {
+        return 'View event';
+      }
+      return 'Open calendar';
+    case 'tasks':
+      if (notificationType === 'task_due') {
+        return 'View task';
+      }
+      if (notificationType === 'task_completed') {
+        return 'View task';
+      }
+      if (notificationType === 'task_assigned') {
+        return 'View task';
+      }
+      return 'Open tasks';
+    case 'email':
+      if (notificationType === 'new_email') {
+        return 'Read email';
+      }
+      if (notificationType === 'email_sent') {
+        return 'View sent';
+      }
+      return 'Open email';
+    case 'family':
+      if (notificationType === 'join_request') {
+        return 'Review request';
+      }
+      if (notificationType === 'member_joined') {
+        return 'View family';
+      }
+      if (notificationType === 'member_left') {
+        return 'View family';
+      }
+      return 'Open family';
+    case 'system':
+      if (notificationType === 'update_available') {
+        return 'Check update';
+      }
+      return 'Open settings';
+    default:
+      return null;
+  }
+}
+
 function NotificationItem({
   item,
   index = 0,
+  onClick,
 }: {
   item: NotificationHistoryItem;
   index?: number;
+  onClick?: (item: NotificationHistoryItem) => void;
 }): JSX.Element {
   const Icon = moduleIcons[item.module] || Bell;
   const timeAgo = formatDistanceToNow(new Date(item.createdAt), { addSuffix: true });
   const shouldReduceMotion = useReducedMotion();
   const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
 
+  const handleClick = (): void => {
+    if (onClick) {
+      onClick(item);
+    }
+  };
+
+  // All notifications are clickable - they navigate to relevant section
+  const actionText = getActionText(item);
+
   return (
     <motion.div
       animate={{ opacity: 1, x: 0 }}
       className={cn(
-        'flex gap-3 rounded-lg p-3 transition-colors hover:bg-accent/50',
+        'flex cursor-pointer gap-3 rounded-lg p-3 transition-colors hover:bg-accent/50',
         item.priority === 'urgent' && 'border-l-2 border-l-destructive bg-destructive/5'
       )}
       initial={{ opacity: 0, x: -10 }}
       transition={{ ...transition, delay: shouldReduceMotion ? 0 : index * 0.03 }}
+      onClick={handleClick}
     >
       <div
         className={cn(
@@ -77,6 +146,7 @@ function NotificationItem({
           <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.body}</p>
         )}
         <p className="mt-1 text-xs text-muted-foreground">{timeAgo}</p>
+        {actionText && <p className="mt-1 text-xs font-medium text-primary">{actionText}</p>}
       </div>
     </motion.div>
   );
@@ -84,10 +154,96 @@ function NotificationItem({
 
 export function NotificationCenter(): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   const { history, preferences, unreadCount, isLoading, clearHistory, togglePaused, markAsViewed } =
     useNotifications();
   const shouldReduceMotion = useReducedMotion();
   const transition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
+
+  // Handle notification click - navigate to relevant section or trigger action
+  const handleNotificationClick = useCallback(
+    (item: NotificationHistoryItem): void => {
+      const notificationType = item.data?.['type'] as string | undefined;
+
+      // Close notification center first
+      setIsOpen(false);
+
+      switch (item.module) {
+        case 'calendar': {
+          const eventId = item.data?.['eventId'] as string | undefined;
+          const calendarId = item.data?.['calendarId'] as string | undefined;
+          if (eventId && calendarId) {
+            // Navigate to specific event
+            navigate(`/calendar?event=${eventId}&calendar=${calendarId}`);
+          } else {
+            navigate('/calendar');
+          }
+          break;
+        }
+
+        case 'tasks': {
+          const taskId = item.data?.['taskId'] as string | undefined;
+          if (taskId) {
+            // Navigate to specific task
+            navigate(`/tasks?task=${taskId}`);
+          } else {
+            navigate('/tasks');
+          }
+          break;
+        }
+
+        case 'email': {
+          const accountId = item.data?.['accountId'] as string | undefined;
+          const messageId = item.data?.['messageId'] as string | undefined;
+          const folder = item.data?.['folder'] as string | undefined;
+          if (accountId && messageId) {
+            // Navigate to specific email
+            navigate(
+              `/email?account=${accountId}&message=${messageId}${folder ? `&folder=${folder}` : ''}`
+            );
+          } else if (accountId) {
+            navigate(`/email?account=${accountId}`);
+          } else {
+            navigate('/email');
+          }
+          break;
+        }
+
+        case 'family': {
+          if (notificationType === 'join_request') {
+            // Dispatch custom event to trigger JoinRequestDialog
+            const event = new CustomEvent('open-join-request-dialog', {
+              detail: {
+                requestId: item.data?.['requestId'],
+                deviceId: item.data?.['deviceId'],
+                deviceName: item.data?.['deviceName'],
+              },
+            });
+            window.dispatchEvent(event);
+          } else {
+            // Navigate to family page
+            navigate('/family');
+          }
+          break;
+        }
+
+        case 'system': {
+          if (notificationType === 'update_available') {
+            // Could trigger update dialog or navigate to settings
+            navigate('/settings?section=updates');
+          } else {
+            navigate('/settings');
+          }
+          break;
+        }
+
+        default:
+          // For unknown modules, just close the popover
+          break;
+      }
+    },
+    [navigate]
+  );
 
   const handleOpenChange = (open: boolean): void => {
     setIsOpen(open);
@@ -180,7 +336,12 @@ export function NotificationCenter(): JSX.Element {
           ) : (
             <div className="divide-y">
               {history.map((item, index) => (
-                <NotificationItem key={item.id} index={index} item={item} />
+                <NotificationItem
+                  key={item.id}
+                  index={index}
+                  item={item}
+                  onClick={handleNotificationClick}
+                />
               ))}
             </div>
           )}

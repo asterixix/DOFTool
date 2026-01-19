@@ -68,6 +68,27 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
         setCurrentRequest(request);
         setShowDialog(true);
       }
+
+      // Emit a notification for the join request
+      void window.electronAPI.notifications
+        .emit({
+          module: 'family',
+          title: 'New Join Request',
+          body: `${request.deviceName} wants to join your family`,
+          priority: 'urgent',
+          data: {
+            type: 'join_request',
+            requestId: request.id,
+            deviceId: request.deviceId,
+            deviceName: request.deviceName,
+          },
+        })
+        .then(() => {
+          console.log('[JoinRequestDialog] Notification emitted for join request');
+        })
+        .catch((err) => {
+          console.error('[JoinRequestDialog] Failed to emit notification:', err);
+        });
     });
 
     return () => {
@@ -116,6 +137,41 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
       setShowDialog(true);
     }
   }, [isAdmin, pendingRequests, currentRequest]);
+
+  // Listen for custom event to open dialog (triggered from notification click)
+  useEffect(() => {
+    const handleOpenDialog = (event: Event): void => {
+      const customEvent = event as CustomEvent<{
+        requestId?: string;
+        deviceId?: string;
+        deviceName?: string;
+      }>;
+      console.log(
+        '[JoinRequestDialog] Received open-join-request-dialog event:',
+        customEvent.detail
+      );
+
+      // Find the request in pending requests
+      const { requestId } = customEvent.detail;
+      if (requestId) {
+        const request = pendingRequests.find((r) => r.id === requestId);
+        if (request) {
+          setCurrentRequest(request);
+          setShowDialog(true);
+        }
+      } else if (pendingRequests.length > 0) {
+        // If no specific requestId, show the first pending request
+        setCurrentRequest(pendingRequests[0] ?? null);
+        setShowDialog(true);
+      }
+    };
+
+    window.addEventListener('open-join-request-dialog', handleOpenDialog);
+
+    return () => {
+      window.removeEventListener('open-join-request-dialog', handleOpenDialog);
+    };
+  }, [pendingRequests]);
 
   const handleApprove = async (): Promise<void> => {
     if (!currentRequest) {
