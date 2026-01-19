@@ -50,12 +50,6 @@ import { testEmailConnections } from './services/EmailServiceConnectionTest';
 import { EncryptionService } from './services/EncryptionService';
 import { ExternalCalendarSyncService } from './services/ExternalCalendarSyncService';
 import {
-  FamilyDiscoveryService,
-  type DiscoveredFamily,
-  type JoinRequest,
-  type JoinApproval,
-} from './services/FamilyDiscoveryService';
-import {
   NotificationService,
   type NotificationEvent,
   type NotificationModule,
@@ -68,9 +62,13 @@ import { ReminderSchedulingService } from './services/ReminderSchedulingService'
 import { StorageService } from './services/StorageService';
 import {
   SyncService,
+  DiscoveryService,
   type SyncStatus,
   type DiscoveredPeer,
   type PeerConnection,
+  type DiscoveredFamily,
+  type JoinRequest,
+  type JoinApproval,
 } from './services/sync';
 import { YjsService, type YjsDocumentStructure } from './services/YjsService';
 import { handleSquirrelEvent } from './squirrel-startup';
@@ -163,7 +161,7 @@ let externalCalendarSyncService: ExternalCalendarSyncService | null = null;
 let notificationService: NotificationService | null = null;
 let reminderSchedulingService: ReminderSchedulingService | null = null;
 let syncService: SyncService | null = null;
-let familyDiscoveryService: FamilyDiscoveryService | null = null;
+let discoveryService: DiscoveryService | null = null;
 let autoUpdaterService: AutoUpdaterService | null = null;
 let tray: Tray | null = null;
 let isQuiting = false;
@@ -644,14 +642,14 @@ async function initializeServices(): Promise<void> {
     // Initialize P2P sync service
     initializeSyncService();
 
-    // Initialize family discovery service
+    // Initialize discovery service (unified for family discovery and peer sync)
     const deviceId = await getStorageService().get('device:id');
     if (deviceId) {
-      familyDiscoveryService = new FamilyDiscoveryService();
-      familyDiscoveryService.initialize(deviceId);
-      console.log('[FamilyDiscovery] Service initialized');
+      discoveryService = new DiscoveryService();
+      discoveryService.initializeBasic(deviceId);
+      console.log('[DiscoveryService] Service initialized');
 
-      // If we have a family and are admin, start publishing
+      // If we have a family and are admin, start publishing for family discovery
       try {
         const familyState = getFamilyState();
         if (familyState.family) {
@@ -659,7 +657,7 @@ async function initializeServices(): Promise<void> {
             (p) => p.memberId === deviceId && p.role === 'admin'
           );
           if (isAdmin) {
-            familyDiscoveryService.startPublishing(familyState.family.id, familyState.family.name);
+            discoveryService.startFamilyPublishing(familyState.family.id, familyState.family.name);
           }
         }
       } catch {
@@ -1805,6 +1803,12 @@ if (typeof ipcMain !== 'undefined') {
       void initializeSyncServiceCore();
     }
 
+    // Start publishing family for discovery by other devices
+    if (discoveryService) {
+      console.log('[FamilyDiscovery] Starting to publish family for discovery...');
+      discoveryService.startPublishing(info.id, info.name);
+    }
+
     return familyState;
   });
 
@@ -1888,34 +1892,34 @@ if (typeof ipcMain !== 'undefined') {
   // ============================================================================
 
   ipcMain.handle('discovery:startDiscovering', () => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       throw new Error('Family discovery service not initialized');
     }
-    familyDiscoveryService.startDiscovering();
+    discoveryService.startDiscovering();
     return { success: true };
   });
 
   ipcMain.handle('discovery:stopDiscovering', () => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       return { success: false };
     }
-    familyDiscoveryService.stopDiscovering();
+    discoveryService.stopDiscovering();
     return { success: true };
   });
 
   ipcMain.handle('discovery:getDiscoveredFamilies', (): DiscoveredFamily[] => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       return [];
     }
-    return familyDiscoveryService.getDiscoveredFamilies();
+    return discoveryService.getDiscoveredFamilies();
   });
 
   ipcMain.handle('discovery:requestJoin', async (_event, familyId: string) => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       throw new Error('Family discovery service not initialized');
     }
 
-    const request = familyDiscoveryService.createJoinRequest(familyId);
+    const request = discoveryService.createJoinRequest(familyId);
 
     // Send the join request to the admin device via WebRTC signaling
     // For now, we'll use a simple approach where the request is stored
@@ -1934,16 +1938,16 @@ if (typeof ipcMain !== 'undefined') {
   });
 
   ipcMain.handle('discovery:getPendingJoinRequests', (): JoinRequest[] => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       return [];
     }
-    return familyDiscoveryService.getPendingJoinRequests();
+    return discoveryService.getPendingJoinRequests();
   });
 
   ipcMain.handle(
     'discovery:approveJoinRequest',
     (_event, requestId: string, role: PermissionRole): JoinApproval | null => {
-      if (!familyDiscoveryService) {
+      if (!discoveryService) {
         throw new Error('Family discovery service not initialized');
       }
 
@@ -1952,7 +1956,7 @@ if (typeof ipcMain !== 'undefined') {
         throw new Error('No family configured');
       }
 
-      const approval = familyDiscoveryService.approveJoinRequest(
+      const approval = discoveryService.approveJoinRequest(
         requestId,
         role,
         familyState.family.id,
@@ -1983,10 +1987,10 @@ if (typeof ipcMain !== 'undefined') {
   );
 
   ipcMain.handle('discovery:rejectJoinRequest', (_event, requestId: string) => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       return false;
     }
-    const rejected = familyDiscoveryService.rejectJoinRequest(requestId);
+    const rejected = discoveryService.rejectJoinRequest(requestId);
 
     if (rejected && mainWindow) {
       mainWindow.webContents.send('discovery:joinRequestRejected', requestId);
@@ -1996,7 +2000,7 @@ if (typeof ipcMain !== 'undefined') {
   });
 
   ipcMain.handle('discovery:startPublishing', () => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       throw new Error('Family discovery service not initialized');
     }
 
@@ -2005,15 +2009,15 @@ if (typeof ipcMain !== 'undefined') {
       throw new Error('No family configured');
     }
 
-    familyDiscoveryService.startPublishing(familyState.family.id, familyState.family.name);
+    discoveryService.startPublishing(familyState.family.id, familyState.family.name);
     return { success: true };
   });
 
   ipcMain.handle('discovery:stopPublishing', () => {
-    if (!familyDiscoveryService) {
+    if (!discoveryService) {
       return { success: false };
     }
-    familyDiscoveryService.stopPublishing();
+    discoveryService.stopPublishing();
     return { success: true };
   });
 
@@ -2021,11 +2025,11 @@ if (typeof ipcMain !== 'undefined') {
   ipcMain.handle(
     'discovery:receiveJoinRequest',
     (_event, deviceId: string, deviceName: string): JoinRequest => {
-      if (!familyDiscoveryService) {
+      if (!discoveryService) {
         throw new Error('Family discovery service not initialized');
       }
 
-      const request = familyDiscoveryService.receiveJoinRequest(deviceId, deviceName);
+      const request = discoveryService.receiveJoinRequest(deviceId, deviceName);
 
       // Notify renderer about the new join request
       if (mainWindow) {

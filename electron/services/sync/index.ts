@@ -6,8 +6,14 @@
 
 export { SyncService } from './SyncService';
 
-// Legacy exports for backward compatibility (may be removed in future)
-export { DiscoveryService } from './DiscoveryService';
+// Discovery service (unified for peer sync and family discovery)
+export {
+  DiscoveryService,
+  type DiscoveredFamily,
+  type JoinRequest,
+  type JoinApproval,
+  type DiscoveryConfig,
+} from './DiscoveryService';
 export { SignalingService } from './SignalingService';
 export { PeerConnectionService, type WebRTCFactory } from './PeerConnectionService';
 export { YjsSyncProvider } from './YjsSyncProvider';
