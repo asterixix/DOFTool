@@ -51,10 +51,7 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
   // Always listen for new join requests (regardless of isAdmin status)
   // This ensures we don't miss events due to timing issues with family data loading
   useEffect(() => {
-    console.log('[JoinRequestDialog] Setting up join request listener');
-
     const unsubscribe = window.electronAPI.discovery.onNewJoinRequest((request) => {
-      console.log('[JoinRequestDialog] Received new join request:', request);
       setPendingRequests((prev) => {
         // Avoid duplicates
         if (prev.some((r) => r.id === request.id)) {
@@ -70,29 +67,21 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
       }
 
       // Emit a notification for the join request
-      void window.electronAPI.notifications
-        .emit({
-          module: 'family',
-          title: 'New Join Request',
-          body: `${request.deviceName} wants to join your family`,
-          priority: 'urgent',
-          data: {
-            type: 'join_request',
-            requestId: request.id,
-            deviceId: request.deviceId,
-            deviceName: request.deviceName,
-          },
-        })
-        .then(() => {
-          console.log('[JoinRequestDialog] Notification emitted for join request');
-        })
-        .catch((err) => {
-          console.error('[JoinRequestDialog] Failed to emit notification:', err);
-        });
+      void window.electronAPI.notifications.emit({
+        module: 'family',
+        title: 'New Join Request',
+        body: `${request.deviceName} wants to join your family`,
+        priority: 'urgent',
+        data: {
+          type: 'join_request',
+          requestId: request.id,
+          deviceId: request.deviceId,
+          deviceName: request.deviceName,
+        },
+      });
     });
 
     return () => {
-      console.log('[JoinRequestDialog] Cleaning up join request listener');
       unsubscribe();
     };
   }, [currentRequest]);
@@ -100,16 +89,12 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
   // Poll for pending join requests (runs when isAdmin becomes true)
   useEffect(() => {
     if (!isAdmin) {
-      console.log('[JoinRequestDialog] Not admin, skipping poll setup');
       return;
     }
-
-    console.log('[JoinRequestDialog] Admin detected, setting up polling');
 
     const checkRequests = async (): Promise<void> => {
       try {
         const requests = await window.electronAPI.discovery.getPendingJoinRequests();
-        console.log('[JoinRequestDialog] Polled pending requests:', requests.length);
         setPendingRequests(requests);
 
         // If there are new requests, show the dialog
@@ -117,8 +102,8 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
           setCurrentRequest(requests[0] ?? null);
           setShowDialog(true);
         }
-      } catch (error) {
-        console.error('Failed to get pending join requests:', error);
+      } catch {
+        // ignore
       }
     };
 
@@ -132,7 +117,6 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
   // When isAdmin changes to true and we have pending requests, show dialog
   useEffect(() => {
     if (isAdmin && pendingRequests.length > 0 && !currentRequest) {
-      console.log('[JoinRequestDialog] Admin with pending requests, showing dialog');
       setCurrentRequest(pendingRequests[0] ?? null);
       setShowDialog(true);
     }
@@ -146,11 +130,6 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
         deviceId?: string;
         deviceName?: string;
       }>;
-      console.log(
-        '[JoinRequestDialog] Received open-join-request-dialog event:',
-        customEvent.detail
-      );
-
       const { requestId, deviceId, deviceName } = customEvent.detail;
 
       // First, try to find in current pending requests
@@ -158,10 +137,8 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
 
       // If not found, fetch fresh pending requests from backend
       if (!request) {
-        console.log('[JoinRequestDialog] Request not in local state, fetching from backend...');
         try {
           const freshRequests = await window.electronAPI.discovery.getPendingJoinRequests();
-          console.log('[JoinRequestDialog] Fetched pending requests:', freshRequests.length);
           setPendingRequests(freshRequests);
 
           // Try to find the request in fresh data
@@ -171,19 +148,17 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
           if (!request && freshRequests.length > 0) {
             request = freshRequests[0];
           }
-        } catch (error) {
-          console.error('[JoinRequestDialog] Failed to fetch pending requests:', error);
+        } catch {
+          // ignore
         }
       }
 
       // If we found a request, show the dialog
       if (request) {
-        console.log('[JoinRequestDialog] Found request, showing dialog:', request);
         setCurrentRequest(request);
         setShowDialog(true);
       } else if (deviceId && deviceName) {
         // Fallback: create a temporary request from event data
-        console.log('[JoinRequestDialog] Creating temporary request from event data');
         const tempRequest: JoinRequest = {
           id: requestId ?? `temp-${Date.now()}`,
           deviceId,
@@ -194,8 +169,6 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
         setPendingRequests((prev) => [...prev, tempRequest]);
         setCurrentRequest(tempRequest);
         setShowDialog(true);
-      } else {
-        console.warn('[JoinRequestDialog] No request found and no fallback data available');
       }
     };
 

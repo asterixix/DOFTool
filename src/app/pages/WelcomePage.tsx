@@ -28,7 +28,7 @@ interface DiscoveredFamily {
 
 export default function WelcomePage(): JSX.Element {
   const navigate = useNavigate();
-  const { createFamily, joinFamily, isCreating, error, clearError } = useFamily();
+  const { createFamily, isCreating, error, clearError } = useFamily();
   const {
     setFirstRunComplete,
     setOnboardingComplete,
@@ -166,17 +166,34 @@ export default function WelcomePage(): JSX.Element {
   useEffect(() => {
     const unsubscribeApproved = window.electronAPI.discovery.onJoinRequestApproved((approval) => {
       void (async () => {
-        if (approval.approved && approval.syncToken) {
+        if (
+          approval.approved &&
+          approval.familyId &&
+          approval.familyName &&
+          approval.role &&
+          approval.syncToken &&
+          approval.adminDeviceId
+        ) {
           setJoinRequestStatus('approved');
 
-          // Use the sync token to join the family
+          // Use the new discovery-based join (bypasses old token system)
           try {
-            const result = await joinFamily(approval.syncToken);
-            if (result) {
+            const result = await window.electronAPI.family.joinFromDiscovery({
+              familyId: approval.familyId,
+              familyName: approval.familyName,
+              role: approval.role,
+              syncToken: approval.syncToken,
+              adminDeviceId: approval.adminDeviceId,
+            });
+            if (result.success) {
               completeSetup('join');
+            } else {
+              console.error('Failed to join family:', result.reason);
+              setJoinRequestStatus('idle');
             }
           } catch (err) {
             console.error('Failed to join family after approval:', err);
+            setJoinRequestStatus('idle');
           }
         }
         setJoinRequestPending(false);
@@ -192,7 +209,7 @@ export default function WelcomePage(): JSX.Element {
       unsubscribeApproved();
       unsubscribeRejected();
     };
-  }, [joinFamily, completeSetup]);
+  }, [completeSetup]);
 
   const pageVariants = {
     initial: shouldReduceMotion ? {} : { opacity: 0, y: 20 },

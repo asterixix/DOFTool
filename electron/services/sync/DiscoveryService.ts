@@ -55,6 +55,7 @@ export interface JoinApproval {
   familyId?: string;
   familyName?: string;
   syncToken?: string;
+  adminDeviceId?: string;
 }
 
 /** Discovery service configuration */
@@ -907,7 +908,8 @@ export class DiscoveryService extends EventEmitter {
     requestId: string,
     role: PermissionRole,
     familyId: string,
-    familyName: string
+    familyName: string,
+    adminDeviceId: string
   ): JoinApproval | null {
     const request = this.pendingJoinRequests.get(requestId);
     if (request?.status !== 'pending') {
@@ -924,6 +926,7 @@ export class DiscoveryService extends EventEmitter {
       familyId,
       familyName,
       syncToken: crypto.randomUUID(),
+      adminDeviceId,
     };
 
     // Store approval indexed by deviceId for polling by requesting device

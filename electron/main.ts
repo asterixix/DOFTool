@@ -2004,6 +2004,78 @@ if (typeof ipcMain !== 'undefined') {
     return { success: true, family };
   });
 
+  // New handler for discovery-based joining (bypasses token validation)
+  ipcMain.handle(
+    'family:joinFromDiscovery',
+    async (
+      _event,
+      data: {
+        familyId: string;
+        familyName: string;
+        role: PermissionRole;
+        syncToken: string;
+        adminDeviceId: string;
+      }
+    ) => {
+      const { devicesMap, permissionsMap, familyMap } = getFamilyCollections();
+
+      // Check if already part of a family
+      const existingFamily = familyMap.get('info') as FamilyInfo | undefined;
+      if (existingFamily) {
+        return { success: false, reason: 'already_in_family' };
+      }
+
+      // Create family info on this device
+      const info: FamilyInfo = {
+        id: data.familyId,
+        name: data.familyName,
+        createdAt: Date.now(),
+        adminDeviceId: data.adminDeviceId,
+      };
+      familyMap.set('info', info);
+
+      // Add this device
+      const device = await ensureDevice();
+      const deviceRecord: DeviceInfo = {
+        ...device,
+        addedAt: Date.now(),
+        lastSeen: Date.now(),
+        isCurrent: true,
+      };
+      devicesMap.set(device.id, deviceRecord);
+
+      // Set permission based on approved role
+      const permission: PermissionInfo = {
+        memberId: device.id,
+        role: data.role,
+        createdAt: Date.now(),
+      };
+      permissionsMap.set(permission.memberId, permission);
+
+      // Store the sync token for later use
+      await getStorageService().set('sync:token', data.syncToken);
+
+      console.log(
+        `[Family] Joined family "${data.familyName}" (${data.familyId}) with role ${data.role}`
+      );
+
+      // Initialize sync service to connect with other devices
+      if (!syncService?.isInitialized()) {
+        console.log('[SyncService] Starting sync service after discovery join...');
+        void initializeSyncServiceCore();
+      } else {
+        console.log('[SyncService] Restarting sync service with new family...');
+        syncService.stop();
+        syncService.destroy();
+        syncService = null;
+        void initializeSyncServiceCore();
+      }
+
+      const familyState = getFamilyState();
+      return { success: true, family: familyState.family };
+    }
+  );
+
   ipcMain.handle('family:devices', () => {
     return getFamilyState().devices;
   });
@@ -2092,27 +2164,26 @@ if (typeof ipcMain !== 'undefined') {
         throw new Error('No family configured');
       }
 
+      // Get the admin device ID (current device)
+      const adminDeviceId = await getStorageService().get('device:id');
+      if (!adminDeviceId) {
+        throw new Error('Admin device ID not found');
+      }
+
       const approval = service.approveJoinRequest(
         requestId,
         role,
         familyState.family.id,
-        familyState.family.name
+        familyState.family.name,
+        adminDeviceId
       );
 
       if (approval) {
-        // Create an invitation token for the approved device
-        const { invitationsMap } = getFamilyCollections();
+        // Generate a sync token for the approved device
         const encryption = getEncryptionService();
         await encryption.initialize();
-        const token = encryption.generateToken(24);
-        const invitation: InvitationInfo = {
-          token,
-          role,
-          createdAt: Date.now(),
-          used: false,
-        };
-        invitationsMap.set(token, invitation);
-        approval.syncToken = token;
+        const syncToken = encryption.generateToken(24);
+        approval.syncToken = syncToken;
 
         // Notify renderer about the approval
         if (mainWindow) {

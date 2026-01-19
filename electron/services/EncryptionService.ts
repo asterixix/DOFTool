@@ -15,8 +15,9 @@ function hasRandomBytesBuf(api: SodiumApi): boolean {
   return typeof (api as unknown as { randombytes_buf?: unknown }).randombytes_buf === 'function';
 }
 
-const sodium: SodiumApi =
-  sodiumDefault && hasRandomBytesBuf(sodiumDefault) ? sodiumDefault : sodiumNamespace;
+function resolveSodiumApi(): SodiumApi {
+  return sodiumDefault && hasRandomBytesBuf(sodiumDefault) ? sodiumDefault : sodiumNamespace;
+}
 
 export interface EncryptionKey {
   /** Raw key bytes (32 bytes for XChaCha20-Poly1305) */
@@ -39,6 +40,7 @@ export interface EncryptedData {
 
 export class EncryptionService {
   private initialized = false;
+  private sodium: SodiumApi | null = null;
 
   /**
    * Initialize libsodium
@@ -47,7 +49,13 @@ export class EncryptionService {
     if (this.initialized) {
       return;
     }
-    await sodium.ready;
+    const candidate = sodiumDefault ?? sodiumNamespace;
+    await candidate.ready;
+    const resolved = resolveSodiumApi();
+    this.sodium = resolved;
+    if (!hasRandomBytesBuf(resolved)) {
+      console.warn('[EncryptionService] libsodium randombytes_buf not available, using fallback');
+    }
     this.initialized = true;
     console.error('[EncryptionService] Initialized with libsodium');
   }
@@ -57,6 +65,7 @@ export class EncryptionService {
    */
   generateKey(): EncryptionKey {
     this.ensureInitialized();
+    const sodium = this.getSodium();
 
     // Additional safety check - ensure sodium functions are available
     if (!sodium.randombytes_buf) {
@@ -73,6 +82,7 @@ export class EncryptionService {
    */
   deriveKeyFromPassphrase(passphrase: string, salt: Uint8Array): EncryptionKey {
     this.ensureInitialized();
+    const sodium = this.getSodium();
 
     // Use crypto_pwhash with Argon2id
     const keyLength = sodium.crypto_secretbox_KEYBYTES;
@@ -97,6 +107,7 @@ export class EncryptionService {
    */
   generateSalt(): Uint8Array {
     this.ensureInitialized();
+    const sodium = this.getSodium();
 
     // Additional safety check - ensure sodium functions are available
     if (!sodium.randombytes_buf) {
@@ -111,6 +122,7 @@ export class EncryptionService {
    */
   encrypt(data: Uint8Array, key: EncryptionKey): EncryptedData {
     this.ensureInitialized();
+    const sodium = this.getSodium();
 
     // Additional safety check - ensure sodium functions are available
     if (!sodium.randombytes_buf || !sodium.crypto_secretbox_easy) {
@@ -135,6 +147,7 @@ export class EncryptionService {
    */
   decrypt(encrypted: EncryptedData, key: EncryptionKey): Uint8Array {
     this.ensureInitialized();
+    const sodium = this.getSodium();
 
     if (encrypted.keyId !== key.id) {
       throw new Error('Key ID mismatch. Cannot decrypt with this key.');
@@ -174,13 +187,7 @@ export class EncryptionService {
    */
   private generateKeyId(): string {
     this.ensureInitialized();
-
-    // Additional safety check - ensure sodium functions are available
-    if (!sodium.randombytes_buf) {
-      throw new Error('libsodium randombytes_buf function not available');
-    }
-
-    const randomBytes = sodium.randombytes_buf(16);
+    const randomBytes = this.getRandomBytes(16);
     return Array.from(randomBytes)
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
@@ -211,13 +218,7 @@ export class EncryptionService {
    */
   generateToken(length = 32): string {
     this.ensureInitialized();
-
-    // Additional safety check - ensure sodium functions are available
-    if (!sodium.randombytes_buf) {
-      throw new Error('libsodium randombytes_buf function not available');
-    }
-
-    const bytes = sodium.randombytes_buf(length);
+    const bytes = this.getRandomBytes(length);
     return Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
@@ -228,7 +229,7 @@ export class EncryptionService {
    */
   constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
     this.ensureInitialized();
-    return sodium.memcmp(a, b);
+    return this.getSodium().memcmp(a, b);
   }
 
   /**
@@ -239,7 +240,7 @@ export class EncryptionService {
     this.ensureInitialized();
     if (data && data.length > 0) {
       data.fill(0);
-      sodium.memzero(data);
+      this.getSodium().memzero(data);
     }
   }
 
@@ -258,15 +259,30 @@ export class EncryptionService {
    */
   generateSecureId(byteLength = 16): string {
     this.ensureInitialized();
-    const bytes = sodium.randombytes_buf(byteLength);
+    const bytes = this.getRandomBytes(byteLength);
     return Buffer.from(bytes).toString('base64url');
+  }
+
+  private getRandomBytes(length: number): Uint8Array {
+    const sodium = this.getSodium();
+    if (sodium.randombytes_buf) {
+      return sodium.randombytes_buf(length);
+    }
+    return new Uint8Array(crypto.randomBytes(length));
+  }
+
+  private getSodium(): SodiumApi {
+    if (!this.sodium) {
+      throw new Error('EncryptionService not initialized. Call initialize() first.');
+    }
+    return this.sodium;
   }
 
   /**
    * Ensure service is initialized
    */
   private ensureInitialized(): void {
-    if (!this.initialized) {
+    if (!this.initialized || !this.sodium) {
       throw new Error('EncryptionService not initialized. Call initialize() first.');
     }
   }

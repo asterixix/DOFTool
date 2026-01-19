@@ -484,6 +484,7 @@ interface JoinApproval {
   familyId?: string;
   familyName?: string;
   syncToken?: string;
+  adminDeviceId?: string;
 }
 
 interface ElectronAPI {
@@ -581,6 +582,13 @@ interface ElectronAPI {
     }>;
     invite: (role: string) => Promise<{ token: string; role: string }>;
     join: (token: string) => Promise<{ success: boolean; family?: { id: string; name: string } }>;
+    joinFromDiscovery: (data: {
+      familyId: string;
+      familyName: string;
+      role: string;
+      syncToken: string;
+      adminDeviceId: string;
+    }) => Promise<{ success: boolean; reason?: string; family?: { id: string; name: string } }>;
     devices: () => Promise<
       Array<{ id: string; name: string; addedAt: number; lastSeen: number; isCurrent: boolean }>
     >;

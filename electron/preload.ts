@@ -427,6 +427,14 @@ const electronAPI = {
       ipcRenderer.invoke('family:invite', role),
     join: (token: string): Promise<{ success: boolean; family?: { id: string; name: string } }> =>
       ipcRenderer.invoke('family:join', token),
+    joinFromDiscovery: (data: {
+      familyId: string;
+      familyName: string;
+      role: string;
+      syncToken: string;
+      adminDeviceId: string;
+    }): Promise<{ success: boolean; reason?: string; family?: { id: string; name: string } }> =>
+      ipcRenderer.invoke('family:joinFromDiscovery', data),
     devices: (): Promise<
       Array<{ id: string; name: string; addedAt: number; lastSeen: number; isCurrent: boolean }>
     > => ipcRenderer.invoke('family:devices'),
