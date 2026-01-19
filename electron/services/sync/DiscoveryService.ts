@@ -10,6 +10,7 @@
 
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
+import http from 'http';
 import * as os from 'os';
 
 import { Bonjour } from 'bonjour-service';
@@ -105,6 +106,11 @@ export class DiscoveryService extends EventEmitter {
 
   // Join requests
   private pendingJoinRequests: Map<string, JoinRequest> = new Map();
+  // Approved requests indexed by deviceId for polling
+  private approvedRequests: Map<string, JoinApproval> = new Map();
+
+  // HTTP server for receiving join requests
+  private httpServer: http.Server | null = null;
 
   constructor() {
     super();
@@ -342,6 +348,155 @@ export class DiscoveryService extends EventEmitter {
   // ============================================================================
 
   /**
+   * Start the HTTP server for receiving join requests (admin device)
+   */
+  private startJoinRequestServer(familyId: string, familyName: string): void {
+    if (this.httpServer) {
+      return; // Already running
+    }
+
+    this.httpServer = http.createServer((req, res) => {
+      // Set CORS headers for local network
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/join-request') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => {
+          body += chunk.toString();
+        });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body) as { deviceId: string; deviceName: string };
+            if (!data.deviceId || !data.deviceName) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Missing deviceId or deviceName' }));
+              return;
+            }
+
+            // Create the join request
+            const request = this.receiveJoinRequest(data.deviceId, data.deviceName);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                success: true,
+                requestId: request.id,
+                familyId,
+                familyName,
+              })
+            );
+
+            console.log(`[DiscoveryService] Received join request from ${data.deviceName}`);
+          } catch (error) {
+            console.error('[DiscoveryService] Error processing join request:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Internal server error' }));
+          }
+        });
+      } else if (req.method === 'GET' && req.url === '/status') {
+        // Health check endpoint
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', familyId, familyName }));
+      } else if (req.method === 'GET' && req.url?.startsWith('/join-status/')) {
+        // Check join request status - allows requesting device to poll for approval
+        const deviceId = req.url.split('/join-status/')[1];
+        if (!deviceId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing deviceId' }));
+          return;
+        }
+
+        // Check if there's an approval for this device
+        const approval = this.approvedRequests.get(deviceId);
+        if (approval) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              status: 'approved',
+              approval: {
+                familyId: approval.familyId,
+                familyName: approval.familyName,
+                role: approval.role,
+                syncToken: approval.syncToken,
+              },
+            })
+          );
+          // Clear after retrieval (one-time use)
+          this.approvedRequests.delete(deviceId);
+          return;
+        }
+
+        // Check if request is still pending
+        let isPending = false;
+        this.pendingJoinRequests.forEach((request) => {
+          if (request.deviceId === deviceId && request.status === 'pending') {
+            isPending = true;
+          }
+        });
+
+        if (isPending) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'pending' }));
+        } else {
+          // Check if rejected
+          let isRejected = false;
+          this.pendingJoinRequests.forEach((request) => {
+            if (request.deviceId === deviceId && request.status === 'rejected') {
+              isRejected = true;
+            }
+          });
+
+          if (isRejected) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'rejected' }));
+          } else {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'not_found' }));
+          }
+        }
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+      }
+    });
+
+    this.httpServer.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.warn(`[DiscoveryService] Port ${FAMILY_SERVICE_PORT} in use, trying next port...`);
+        // Try next port
+        this.httpServer?.listen(FAMILY_SERVICE_PORT + 1);
+      } else {
+        console.error('[DiscoveryService] HTTP server error:', error);
+      }
+    });
+
+    this.httpServer.listen(FAMILY_SERVICE_PORT, () => {
+      console.log(
+        `[DiscoveryService] Join request server listening on port ${FAMILY_SERVICE_PORT}`
+      );
+    });
+  }
+
+  /**
+   * Stop the HTTP server for join requests
+   */
+  private stopJoinRequestServer(): void {
+    if (this.httpServer) {
+      this.httpServer.close();
+      this.httpServer = null;
+      console.log('[DiscoveryService] Join request server stopped');
+    }
+  }
+
+  /**
    * Start publishing family presence on the network (admin devices only)
    */
   startFamilyPublishing(familyId: string, familyName: string): void {
@@ -358,6 +513,9 @@ export class DiscoveryService extends EventEmitter {
     this.currentFamilyId = familyId;
 
     try {
+      // Start HTTP server to receive join requests
+      this.startJoinRequestServer(familyId, familyName);
+
       this.familyAdvertisement = this.bonjour.publish({
         name: `${familyName}-${familyId.slice(0, 8)}`,
         type: FAMILY_SERVICE_TYPE,
@@ -383,6 +541,9 @@ export class DiscoveryService extends EventEmitter {
    * Stop publishing family presence
    */
   stopFamilyPublishing(): void {
+    // Stop HTTP server
+    this.stopJoinRequestServer();
+
     if (this.isStoppable(this.familyAdvertisement)) {
       try {
         this.familyAdvertisement.stop();
@@ -500,7 +661,69 @@ export class DiscoveryService extends EventEmitter {
   // ============================================================================
 
   /**
-   * Create a join request (requesting device side)
+   * Send join request over HTTP to the admin device
+   */
+  private sendJoinRequestHttp(
+    host: string,
+    port: number,
+    deviceId: string,
+    deviceName: string
+  ): Promise<{ success: boolean; requestId?: string; error?: string }> {
+    return new Promise((resolve) => {
+      const postData = JSON.stringify({ deviceId, deviceName });
+
+      const options = {
+        hostname: host,
+        port,
+        path: '/join-request',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+        timeout: 10000,
+      };
+
+      console.log(`[DiscoveryService] Sending join request to ${host}:${port}`);
+
+      const req = http.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk: Buffer) => {
+          data += chunk.toString();
+        });
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data) as {
+              success: boolean;
+              requestId?: string;
+              error?: string;
+            };
+            console.log(`[DiscoveryService] Join request response:`, response);
+            resolve(response);
+          } catch {
+            resolve({ success: false, error: 'Invalid response from server' });
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error(`[DiscoveryService] Join request failed:`, error.message);
+        resolve({ success: false, error: error.message });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ success: false, error: 'Request timed out' });
+      });
+
+      req.write(postData);
+      req.end();
+    });
+  }
+
+  /**
+   * Create a join request (requesting device side) - sends HTTP request to admin device
+   * Returns the request and starts polling for approval
    */
   createJoinRequest(familyId: string): JoinRequest {
     const request: JoinRequest = {
@@ -513,7 +736,143 @@ export class DiscoveryService extends EventEmitter {
 
     this.pendingJoinRequests.set(request.id, request);
     console.log(`[DiscoveryService] Created join request for family ${familyId}: ${request.id}`);
+
+    // Find the discovered family to get host/port
+    const family = this.discoveredFamilies.get(familyId);
+    if (family) {
+      // Send the request over HTTP to the admin device
+      void this.sendJoinRequestHttp(
+        family.host,
+        family.port,
+        this.deviceId ?? '',
+        this.deviceName
+      ).then((response) => {
+        if (response.success) {
+          console.log(
+            `[DiscoveryService] Join request sent successfully, server requestId: ${response.requestId}`
+          );
+          // Start polling for approval
+          this.startPollingForApproval(family, request);
+        } else {
+          console.error(`[DiscoveryService] Failed to send join request: ${response.error}`);
+          request.status = 'rejected';
+          this.emit('join-request-rejected', request.id);
+        }
+      });
+    } else {
+      console.error(
+        `[DiscoveryService] Cannot send join request: family ${familyId} not found in discovered families`
+      );
+    }
+
     return request;
+  }
+
+  /**
+   * Poll for join request approval from the admin device
+   */
+  private startPollingForApproval(family: DiscoveredFamily, request: JoinRequest): void {
+    const maxAttempts = 60; // Poll for up to 5 minutes (60 * 5 seconds)
+    let attempts = 0;
+
+    const poll = (): void => {
+      if (attempts >= maxAttempts || request.status !== 'pending') {
+        if (request.status === 'pending') {
+          console.log('[DiscoveryService] Join request polling timed out');
+          request.status = 'rejected';
+          this.emit('join-request-rejected', request.id);
+        }
+        return;
+      }
+
+      attempts++;
+      this.checkJoinStatus(family.host, family.port, this.deviceId ?? '')
+        .then((status) => {
+          if (status.status === 'approved' && status.approval) {
+            console.log('[DiscoveryService] Join request approved!', status.approval);
+            request.status = 'approved';
+            request.assignedRole = status.approval.role as PermissionRole;
+
+            const approval: JoinApproval = {
+              requestId: request.id,
+              approved: true,
+              role: status.approval.role as PermissionRole,
+              familyId: status.approval.familyId,
+              familyName: status.approval.familyName,
+              syncToken: status.approval.syncToken,
+            };
+            this.emit('join-request-approved', approval);
+          } else if (status.status === 'rejected') {
+            console.log('[DiscoveryService] Join request rejected');
+            request.status = 'rejected';
+            this.emit('join-request-rejected', request.id);
+          } else if (status.status === 'pending') {
+            // Continue polling
+            setTimeout(poll, 5000);
+          } else {
+            // Request not found or error - continue polling a few more times
+            setTimeout(poll, 5000);
+          }
+        })
+        .catch((error) => {
+          console.error('[DiscoveryService] Error polling for approval:', error);
+          setTimeout(poll, 5000);
+        });
+    };
+
+    // Start polling after a short delay
+    setTimeout(poll, 2000);
+  }
+
+  /**
+   * Check join request status from admin device
+   */
+  private checkJoinStatus(
+    host: string,
+    port: number,
+    deviceId: string
+  ): Promise<{
+    status: string;
+    approval?: { familyId: string; familyName: string; role: string; syncToken: string };
+  }> {
+    return new Promise((resolve) => {
+      const options = {
+        hostname: host,
+        port,
+        path: `/join-status/${encodeURIComponent(deviceId)}`,
+        method: 'GET',
+        timeout: 10000,
+      };
+
+      const req = http.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk: Buffer) => {
+          data += chunk.toString();
+        });
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data) as {
+              status: string;
+              approval?: { familyId: string; familyName: string; role: string; syncToken: string };
+            };
+            resolve(response);
+          } catch {
+            resolve({ status: 'error' });
+          }
+        });
+      });
+
+      req.on('error', () => {
+        resolve({ status: 'error' });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ status: 'error' });
+      });
+
+      req.end();
+    });
   }
 
   /**
@@ -566,6 +925,9 @@ export class DiscoveryService extends EventEmitter {
       familyName,
       syncToken: crypto.randomUUID(),
     };
+
+    // Store approval indexed by deviceId for polling by requesting device
+    this.approvedRequests.set(request.deviceId, approval);
 
     console.log(`[DiscoveryService] Approved join request ${requestId} with role ${role}`);
     this.emit('join-request-approved', approval);

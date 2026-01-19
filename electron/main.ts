@@ -649,6 +649,44 @@ async function initializeServices(): Promise<void> {
       discoveryService.initializeBasic(deviceId);
       console.log('[DiscoveryService] Service initialized');
 
+      // Set up event listeners to forward join requests to renderer
+      discoveryService.on('join-request-received', (request: JoinRequest) => {
+        console.log('[DiscoveryService] Join request received from:', request.deviceName);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('discovery:newJoinRequest', request);
+        }
+      });
+
+      // Forward approval to renderer (for requesting device that sent the join request)
+      discoveryService.on('join-request-approved', (approval: JoinApproval) => {
+        console.log('[DiscoveryService] Join request approved:', approval);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('discovery:joinRequestApproved', approval);
+        }
+      });
+
+      // Forward rejection to renderer
+      discoveryService.on('join-request-rejected', (requestId: string) => {
+        console.log('[DiscoveryService] Join request rejected:', requestId);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('discovery:joinRequestRejected', requestId);
+        }
+      });
+
+      discoveryService.on('family-discovered', (family: DiscoveredFamily) => {
+        console.log('[DiscoveryService] Family discovered:', family.name);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('discovery:familyDiscovered', family);
+        }
+      });
+
+      discoveryService.on('family-lost', (familyId: string) => {
+        console.log('[DiscoveryService] Family lost:', familyId);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('discovery:familyLost', familyId);
+        }
+      });
+
       // If we have a family and are admin, start publishing for family discovery
       try {
         const familyState = getFamilyState();
