@@ -140,7 +140,7 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
 
   // Listen for custom event to open dialog (triggered from notification click)
   useEffect(() => {
-    const handleOpenDialog = (event: Event): void => {
+    const handleOpenDialog = async (event: Event): Promise<void> => {
       const customEvent = event as CustomEvent<{
         requestId?: string;
         deviceId?: string;
@@ -151,25 +151,62 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
         customEvent.detail
       );
 
-      // Find the request in pending requests
-      const { requestId } = customEvent.detail;
-      if (requestId) {
-        const request = pendingRequests.find((r) => r.id === requestId);
-        if (request) {
-          setCurrentRequest(request);
-          setShowDialog(true);
+      const { requestId, deviceId, deviceName } = customEvent.detail;
+
+      // First, try to find in current pending requests
+      let request = pendingRequests.find((r) => r.id === requestId);
+
+      // If not found, fetch fresh pending requests from backend
+      if (!request) {
+        console.log('[JoinRequestDialog] Request not in local state, fetching from backend...');
+        try {
+          const freshRequests = await window.electronAPI.discovery.getPendingJoinRequests();
+          console.log('[JoinRequestDialog] Fetched pending requests:', freshRequests.length);
+          setPendingRequests(freshRequests);
+
+          // Try to find the request in fresh data
+          request = freshRequests.find((r) => r.id === requestId);
+
+          // If still not found but we have requests, use the first one
+          if (!request && freshRequests.length > 0) {
+            request = freshRequests[0];
+          }
+        } catch (error) {
+          console.error('[JoinRequestDialog] Failed to fetch pending requests:', error);
         }
-      } else if (pendingRequests.length > 0) {
-        // If no specific requestId, show the first pending request
-        setCurrentRequest(pendingRequests[0] ?? null);
+      }
+
+      // If we found a request, show the dialog
+      if (request) {
+        console.log('[JoinRequestDialog] Found request, showing dialog:', request);
+        setCurrentRequest(request);
         setShowDialog(true);
+      } else if (deviceId && deviceName) {
+        // Fallback: create a temporary request from event data
+        console.log('[JoinRequestDialog] Creating temporary request from event data');
+        const tempRequest: JoinRequest = {
+          id: requestId ?? `temp-${Date.now()}`,
+          deviceId,
+          deviceName,
+          requestedAt: Date.now(),
+          status: 'pending',
+        };
+        setPendingRequests((prev) => [...prev, tempRequest]);
+        setCurrentRequest(tempRequest);
+        setShowDialog(true);
+      } else {
+        console.warn('[JoinRequestDialog] No request found and no fallback data available');
       }
     };
 
-    window.addEventListener('open-join-request-dialog', handleOpenDialog);
+    const handler = (event: Event): void => {
+      void handleOpenDialog(event);
+    };
+
+    window.addEventListener('open-join-request-dialog', handler);
 
     return () => {
-      window.removeEventListener('open-join-request-dialog', handleOpenDialog);
+      window.removeEventListener('open-join-request-dialog', handler);
     };
   }, [pendingRequests]);
 
