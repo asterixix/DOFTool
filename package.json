@@ -11,10 +11,10 @@
   "homepage": "https://sendyka.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/doftool/doftool.git"
+    "url": "https://github.com/asterixix/DOFTool.git"
   },
   "bugs": {
-    "url": "https://github.com/doftool/doftool/issues"
+    "url": "https://github.com/asterixix/DOFTool/issues"
   },
   "keywords": [
     "family",
@@ -41,14 +41,15 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build:win": "npm run icons && npm run build && electron-builder --win",
-    "build:mac": "npm run icons && npm run build && electron-builder --mac",
-    "build:linux": "npm run icons && npm run build && electron-builder --linux",
-    "build:all": "npm run icons && npm run build && electron-builder --win --mac --linux",
-    "release": "npm run icons && npm run build && electron-builder --win --mac --linux --publish always",
-    "release:win": "npm run icons && npm run build && electron-builder --win --publish always",
-    "release:mac": "npm run icons && npm run build && electron-builder --mac --publish always",
-    "release:linux": "npm run icons && npm run build && electron-builder --linux --publish always",
+    "package": "npm run icons && npm run build && electron-forge package",
+    "make": "npm run icons && npm run build && electron-forge make",
+    "make:win": "npm run icons && npm run build && electron-forge make --platform win32",
+    "make:mac": "npm run icons && npm run build && electron-forge make --platform darwin",
+    "make:linux": "npm run icons && npm run build && electron-forge make --platform linux",
+    "publish": "npm run icons && npm run build && electron-forge publish",
+    "publish:win": "npm run icons && npm run build && electron-forge publish --platform win32",
+    "publish:mac": "npm run icons && npm run build && electron-forge publish --platform darwin",
+    "publish:linux": "npm run icons && npm run build && electron-forge publish --platform linux",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -66,8 +67,7 @@
     "version:prerelease": "node scripts/bump-version.js prerelease --tag",
     "typecheck": "tsc --noEmit",
     "typecheck:electron": "tsc --noEmit -p tsconfig.electron.json",
-    "prepare": "husky",
-    "postinstall": "electron-builder install-app-deps"
+    "prepare": "husky"
   },
   "dependencies": {
     "@aptabase/electron": "^0.3.1",
@@ -103,6 +103,7 @@
     "date-fns": "^3.6.0",
     "dompurify": "^3.3.1",
     "electron-store": "^10.0.0",
+    "electron-updater": "^6.1.7",
     "framer-motion": "^11.3.21",
     "ical.js": "^2.0.1",
     "imapflow": "^1.0.164",
@@ -120,6 +121,7 @@
     "react-router-dom": "^6.26.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "update-electron-app": "^3.0.0",
     "uuid": "^10.0.0",
     "ws": "^8.19.0",
     "y-leveldb": "^0.1.2",
@@ -130,6 +132,19 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.3.1",
+    "@commitlint/config-conventional": "^20.3.1",
+    "@electron-forge/cli": "^7.4.0",
+    "@electron-forge/maker-deb": "^7.4.0",
+    "@electron-forge/maker-dmg": "^7.4.0",
+    "@electron-forge/maker-rpm": "^7.4.0",
+    "@electron-forge/maker-squirrel": "^7.4.0",
+    "@electron-forge/maker-zip": "^7.4.0",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
+    "@electron-forge/plugin-fuses": "^7.4.0",
+    "@electron-forge/publisher-github": "^7.4.0",
+    "@electron-forge/shared-types": "^7.4.0",
+    "@electron/fuses": "^1.8.0",
     "@playwright/test": "^1.46.0",
     "@testing-library/jest-dom": "^6.4.8",
     "@testing-library/react": "^16.0.0",
@@ -149,7 +164,6 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^8.2.2",
     "electron": "^33.4.11",
-    "electron-builder": "^24.13.3",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-import-resolver-node": "^0.3.9",
@@ -181,118 +195,5 @@
     "*.{json,md,css}": [
       "prettier --write"
     ]
-  },
-  "build": {
-    "appId": "app.doftool.desktop",
-    "productName": "DOFTool",
-    "directories": {
-      "output": "dist-release"
-    },
-    "forceCodeSigning": false,
-    "publish": {
-      "provider": "github",
-      "owner": "doftool",
-      "repo": "doftool"
-    },
-    "files": [
-      "dist/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
-      "icon": "public/icon.ico",
-      "sign": null,
-      "certificateFile": null,
-      "certificatePassword": "",
-      "certificateSubjectName": null,
-      "certificateSha1": null,
-      "publisherName": null
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "public/icon.icns",
-      "category": "public.app-category.productivity",
-      "identity": null,
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "public/entitlements.mac.plist",
-      "entitlementsInherit": "public/entitlements.mac.plist",
-      "extendInfo": {
-        "NSHumanReadableCopyright": "Copyright © 2024 Artur Sendyka",
-        "CFBundleShortVersionString": "1.0.0",
-        "LSApplicationCategoryType": "public.app-category.productivity",
-        "NSLocalNetworkUsageDescription": "DOFTool uses local network to sync data between family devices.",
-        "NSBonjourServices": [
-          "_doftool._tcp"
-        ]
-      }
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ],
-      "window": {
-        "width": 540,
-        "height": 380
-      }
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb",
-        "rpm"
-      ],
-      "icon": "public",
-      "category": "Office",
-      "synopsis": "Family collaboration tool for Calendar, Tasks, and Email",
-      "description": "Decentralized, offline-first, end-to-end encrypted family collaboration for Calendar, Tasks, and Email with P2P synchronization.",
-      "maintainer": "Artur Sendyka <artur@sendyka.dev>",
-      "vendor": "DOFTool",
-      "desktop": {
-        "Name": "DOFTool",
-        "Comment": "Family collaboration for Calendar, Tasks, and Email",
-        "Categories": "Office;Calendar;ProjectManagement;Email;",
-        "Keywords": "family;calendar;tasks;email;sync;offline;encrypted;",
-        "StartupNotify": "true",
-        "StartupWMClass": "doftool"
-      },
-      "executableArgs": [
-        "--no-sandbox"
-      ]
-    },
-    "deb": {
-      "priority": "optional",
-      "compression": "xz",
-      "depends": [
-        "libnotify4",
-        "libsecret-1-0"
-      ]
-    },
-    "rpm": {
-      "compression": "xz"
-    },
-    "appImage": {
-      "artifactName": "${productName}-${version}-${arch}.AppImage"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true
-    }
   }
 }

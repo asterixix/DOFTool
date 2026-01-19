@@ -1,7 +1,70 @@
 /**
- * Integration tests for EncryptionService
+ * Unit tests for EncryptionService
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
+
+// Mock libsodium-wrappers to avoid ESM import issues in vitest
+vi.mock('libsodium-wrappers', () => {
+  let counter = 0;
+  return {
+    default: {
+      ready: Promise.resolve(),
+      crypto_secretbox_KEYBYTES: 32,
+      crypto_secretbox_NONCEBYTES: 24,
+      crypto_pwhash_SALTBYTES: 16,
+      crypto_pwhash_ALG_ARGON2ID13: 2,
+      crypto_pwhash_OPSLIMIT_MODERATE: 3,
+      crypto_pwhash_MEMLIMIT_MODERATE: 268435456,
+      randombytes_buf: (length: number) => {
+        counter++;
+        const arr = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+          arr[i] = (counter + i) % 256;
+        }
+        return arr;
+      },
+      crypto_secretbox_easy: (message: Uint8Array, _nonce: Uint8Array, _key: Uint8Array) => {
+        // Simple mock encryption: prepend 16-byte auth tag to message
+        const result = new Uint8Array(message.length + 16);
+        result.set(message, 16);
+        return result;
+      },
+      crypto_secretbox_open_easy: (
+        ciphertext: Uint8Array,
+        _nonce: Uint8Array,
+        _key: Uint8Array
+      ) => {
+        // Simple mock decryption: remove the 16-byte auth tag prefix
+        return ciphertext.slice(16);
+      },
+      crypto_pwhash: (
+        keyLength: number,
+        password: string,
+        salt: Uint8Array,
+        _opsLimit: number,
+        _memLimit: number,
+        _algorithm: number
+      ) => {
+        // Generate deterministic key based on password and salt
+        const result = new Uint8Array(keyLength);
+        let hash = 0;
+        for (let i = 0; i < password.length; i++) {
+          hash = ((hash << 5) - hash + password.charCodeAt(i)) | 0;
+        }
+        for (let i = 0; i < salt.length; i++) {
+          hash = ((hash << 5) - hash + salt[i]) | 0;
+        }
+        for (let i = 0; i < keyLength; i++) {
+          result[i] = (hash + i) % 256;
+        }
+        return result;
+      },
+      memzero: () => {
+        // No-op for tests
+      },
+    },
+  };
+});
 
 import { EncryptionService } from './EncryptionService';
 

@@ -25,6 +25,7 @@ interface VersionInfoState {
   updateInfo: UpdateInfo | null;
   isChecking: boolean;
   lastCheckedAt: number | null;
+  isLoading: boolean;
 }
 
 interface UseVersionInfoReturn {
@@ -43,18 +44,36 @@ export function useVersionInfo(): UseVersionInfoReturn {
     updateInfo: null,
     isChecking: false,
     lastCheckedAt: null,
+    isLoading: true,
   });
 
   useEffect(() => {
     // Load current version on mount
-    void window.electronAPI.getVersion().then((version) => {
-      setState((prev) => ({ ...prev, currentVersion: version }));
-    });
+    const loadVersion = async (): Promise<void> => {
+      try {
+        const version = await window.electronAPI.getVersion();
+        setState((prev) => ({ ...prev, currentVersion: version }));
+      } catch (error) {
+        console.error('Failed to load version:', error);
+      }
+    };
 
     // Load last checked time
-    void window.electronAPI.updater.getLastChecked().then((lastChecked) => {
-      setState((prev) => ({ ...prev, lastCheckedAt: lastChecked ?? null }));
-    });
+    const loadLastChecked = async (): Promise<void> => {
+      try {
+        const lastChecked = await window.electronAPI.updater.getLastChecked();
+        setState((prev) => ({ ...prev, lastCheckedAt: lastChecked ?? null }));
+      } catch (error) {
+        console.error('Failed to load last checked:', error);
+      }
+    };
+
+    const initialize = async (): Promise<void> => {
+      await Promise.all([loadVersion(), loadLastChecked()]);
+      setState((prev) => ({ ...prev, isLoading: false }));
+    };
+
+    void initialize();
   }, []);
 
   const checkForUpdates = async (notifyIfAvailable = false): Promise<void> => {

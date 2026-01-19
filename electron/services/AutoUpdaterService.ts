@@ -1,7 +1,43 @@
-import https from 'https';
+/**
+ * Auto-Updater Service - Handles automatic updates using electron-updater
+ * Compatible with Electron Forge GitHub publisher
+ */
 
 import type { NotificationService } from './NotificationService';
 import type { shell as ElectronShell, app as ElectronApp } from 'electron';
+import type { autoUpdater } from 'electron-updater';
+import type { RequestOptions } from 'https';
+
+// electron-updater types
+interface UpdateInfo {
+  version: string;
+  releaseNotes?: string | ReleaseNoteInfo[];
+  releaseName?: string;
+  releaseDate: string;
+}
+
+interface ReleaseNoteInfo {
+  version: string;
+  note: string | null;
+}
+
+interface ProgressInfo {
+  total: number;
+  delta: number;
+  transferred: number;
+  percent: number;
+  bytesPerSecond: number;
+}
+
+export interface AppUpdateInfo {
+  version: string;
+  currentVersion: string;
+  hasUpdate: boolean;
+  releaseNotes?: string;
+  releaseName?: string;
+  releaseDate?: string;
+  downloadProgress?: number;
+}
 
 export interface GitHubRelease {
   tag_name: string;
@@ -17,14 +53,6 @@ export interface GitHubRelease {
   draft: boolean;
 }
 
-export interface UpdateInfo {
-  version: string;
-  currentVersion: string;
-  hasUpdate: boolean;
-  release?: GitHubRelease;
-  downloadUrl?: string;
-}
-
 export class AutoUpdaterService {
   private readonly notificationService: NotificationService;
   private readonly owner: string;
@@ -34,6 +62,11 @@ export class AutoUpdaterService {
   private lastCheckedAt: number | null;
   private shell?: typeof ElectronShell;
   private app?: typeof ElectronApp;
+  private autoUpdater: typeof autoUpdater | null = null;
+  private updateAvailable: UpdateInfo | null = null;
+  private downloadProgress: number = 0;
+  private isDownloading: boolean = false;
+  private isUpdateDownloaded: boolean = false;
 
   public constructor(notificationService: NotificationService, currentVersion: string) {
     this.notificationService = notificationService;
@@ -42,6 +75,68 @@ export class AutoUpdaterService {
     this.currentVersion = currentVersion;
     this.updateCheckInProgress = false;
     this.lastCheckedAt = null;
+
+    // Initialize electron-updater asynchronously
+    void this.initializeAutoUpdater();
+  }
+
+  private async initializeAutoUpdater(): Promise<void> {
+    try {
+      // Dynamic import to handle cases where electron-updater might not be available
+      const { autoUpdater } = await import('electron-updater');
+      this.autoUpdater = autoUpdater;
+
+      // Configure auto-updater for GitHub releases
+      autoUpdater.setFeedURL({
+        provider: 'github',
+        owner: this.owner,
+        repo: this.repo,
+      });
+
+      // Don't auto-download updates - let the user decide
+      autoUpdater.autoDownload = false;
+      autoUpdater.autoInstallOnAppQuit = true;
+
+      // Allow prereleases based on environment
+      autoUpdater.allowPrerelease = false;
+
+      // Set up event listeners
+      autoUpdater.on('checking-for-update', () => {
+        console.log('[AutoUpdater] Checking for updates...');
+      });
+
+      autoUpdater.on('update-available', (info: UpdateInfo) => {
+        console.log('[AutoUpdater] Update available:', info.version);
+        this.updateAvailable = info;
+        void this.notifyUpdateAvailable(info);
+      });
+
+      autoUpdater.on('update-not-available', (_info: UpdateInfo) => {
+        console.log('[AutoUpdater] No updates available');
+      });
+
+      autoUpdater.on('download-progress', (progress: ProgressInfo) => {
+        this.downloadProgress = progress.percent;
+        console.log(`[AutoUpdater] Download progress: ${Math.round(progress.percent)}%`);
+      });
+
+      autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+        console.log('[AutoUpdater] Update downloaded:', info.version);
+        this.isDownloading = false;
+        this.isUpdateDownloaded = true;
+        void this.notifyUpdateReady(info);
+      });
+
+      autoUpdater.on('error', (error: Error) => {
+        console.error('[AutoUpdater] Error:', error.message);
+        this.isDownloading = false;
+      });
+
+      console.log('[AutoUpdater] Initialized successfully');
+    } catch (error) {
+      console.error('[AutoUpdater] Failed to initialize electron-updater:', error);
+      // Fallback to manual GitHub API checking will be used
+    }
   }
 
   public setElectronModules(modules: {
@@ -52,7 +147,7 @@ export class AutoUpdaterService {
     this.app = modules.app;
   }
 
-  public async checkForUpdates(notifyIfAvailable = true): Promise<UpdateInfo> {
+  public async checkForUpdates(notifyIfAvailable = true): Promise<AppUpdateInfo> {
     if (this.updateCheckInProgress) {
       return {
         version: this.currentVersion,
@@ -65,7 +160,34 @@ export class AutoUpdaterService {
     this.lastCheckedAt = Date.now();
 
     try {
-      // Manual GitHub API check
+      // Try using electron-updater if available
+      if (this.autoUpdater) {
+        try {
+          const result = await this.autoUpdater.checkForUpdates();
+
+          this.updateCheckInProgress = false;
+
+          if (result?.updateInfo) {
+            const hasUpdate = this.isNewerVersion(result.updateInfo.version, this.currentVersion);
+
+            return {
+              version: result.updateInfo.version,
+              currentVersion: this.currentVersion,
+              hasUpdate,
+              releaseNotes: this.formatReleaseNotes(result.updateInfo.releaseNotes),
+              releaseName: result.updateInfo.releaseName,
+              releaseDate: result.updateInfo.releaseDate,
+            };
+          }
+        } catch (autoUpdaterError) {
+          console.warn(
+            '[AutoUpdater] electron-updater check failed, falling back to GitHub API:',
+            autoUpdaterError
+          );
+        }
+      }
+
+      // Fallback to manual GitHub API check
       const releases = await this.fetchGitHubReleases();
       if (releases.length === 0) {
         this.updateCheckInProgress = false;
@@ -92,7 +214,12 @@ export class AutoUpdaterService {
       const hasUpdate = this.isNewerVersion(latestVersion, this.currentVersion);
 
       if (hasUpdate && notifyIfAvailable) {
-        await this.notifyUpdateAvailable(latestVersion, latestRelease);
+        await this.notifyUpdateAvailable({
+          version: latestVersion,
+          releaseNotes: latestRelease.body,
+          releaseName: latestRelease.name,
+          releaseDate: latestRelease.published_at,
+        });
       }
 
       this.updateCheckInProgress = false;
@@ -100,7 +227,9 @@ export class AutoUpdaterService {
         version: latestVersion,
         currentVersion: this.currentVersion,
         hasUpdate,
-        release: latestRelease,
+        releaseNotes: latestRelease.body,
+        releaseName: latestRelease.name,
+        releaseDate: latestRelease.published_at,
       };
     } catch (error) {
       this.updateCheckInProgress = false;
@@ -115,11 +244,24 @@ export class AutoUpdaterService {
   }
 
   public async downloadUpdate(releaseUrl?: string): Promise<{ success: boolean; error?: string }> {
-    // For now, we'll open the release page in the browser
-    // Full auto-update installation requires electron-updater or manual download
+    // Try using electron-updater for automatic download
+    if (this.autoUpdater && this.updateAvailable) {
+      try {
+        this.isDownloading = true;
+        this.downloadProgress = 0;
+        await this.autoUpdater.downloadUpdate();
+        return { success: true };
+      } catch (error) {
+        this.isDownloading = false;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[AutoUpdater] Failed to download update:', errorMessage);
+        // Fall through to manual download
+      }
+    }
+
+    // Fallback: open the release page in the browser for manual download
     try {
       if (!this.shell) {
-        // Fallback to dynamic import if not set
         const electron = await import('electron');
         const url = releaseUrl ?? `https://github.com/${this.owner}/${this.repo}/releases/latest`;
         await electron.shell.openExternal(url);
@@ -136,9 +278,14 @@ export class AutoUpdaterService {
   }
 
   public async quitAndInstall(): Promise<void> {
-    // For manual installation, we just restart after download
+    // If update is downloaded via electron-updater, use its install method
+    if (this.autoUpdater && this.isUpdateDownloaded) {
+      this.autoUpdater.quitAndInstall(false, true);
+      return;
+    }
+
+    // Fallback: just restart the app
     if (!this.app) {
-      // Fallback to dynamic import if not set
       const electron = await import('electron');
       electron.app.relaunch();
       electron.app.exit();
@@ -156,10 +303,25 @@ export class AutoUpdaterService {
     return this.currentVersion;
   }
 
+  public getDownloadProgress(): number {
+    return this.downloadProgress;
+  }
+
+  public isDownloadInProgress(): boolean {
+    return this.isDownloading;
+  }
+
+  public isReadyToInstall(): boolean {
+    return this.isUpdateDownloaded;
+  }
+
   private async fetchGitHubReleases(): Promise<GitHubRelease[]> {
+    // Use dynamic import for https
+    const https = await import('https');
+
     return new Promise((resolve, reject) => {
       const url = `https://api.github.com/repos/${this.owner}/${this.repo}/releases`;
-      const options: https.RequestOptions = {
+      const options: RequestOptions = {
         headers: {
           'User-Agent': 'DOFTool-AutoUpdater',
           Accept: 'application/vnd.github.v3+json',
@@ -229,24 +391,56 @@ export class AutoUpdaterService {
     });
   }
 
-  private async notifyUpdateAvailable(version: string, release?: GitHubRelease): Promise<void> {
-    const releaseNotes =
-      release?.body && release.body.length > 0
-        ? release.body.substring(0, 200) + (release.body.length > 200 ? '...' : '')
-        : undefined;
+  private formatReleaseNotes(notes: string | ReleaseNoteInfo[] | undefined): string | undefined {
+    if (!notes) {
+      return undefined;
+    }
+
+    if (typeof notes === 'string') {
+      return notes;
+    }
+
+    // Handle array of release notes
+    return notes
+      .map((note) => {
+        if (note.note) {
+          return `## ${note.version}\n${note.note}`;
+        }
+        return `## ${note.version}`;
+      })
+      .join('\n\n');
+  }
+
+  private async notifyUpdateAvailable(info: UpdateInfo): Promise<void> {
+    const releaseNotes = this.formatReleaseNotes(info.releaseNotes);
+    const truncatedNotes =
+      releaseNotes && releaseNotes.length > 200
+        ? releaseNotes.substring(0, 200) + '...'
+        : releaseNotes;
 
     await this.notificationService.emit({
       module: 'system',
       title: 'Update Available',
-      body: `A new version (${version}) is available. Click to download and install.`,
+      body: `A new version (${info.version}) is available. Click to download and install.`,
       priority: 'normal',
       data: {
         action: 'update-available',
-        version,
-        releaseNotes,
-        releaseUrl: release
-          ? `https://github.com/${this.owner}/${this.repo}/releases/tag/${release.tag_name}`
-          : undefined,
+        version: info.version,
+        releaseNotes: truncatedNotes,
+        releaseUrl: `https://github.com/${this.owner}/${this.repo}/releases/tag/v${info.version}`,
+      },
+    });
+  }
+
+  private async notifyUpdateReady(info: UpdateInfo): Promise<void> {
+    await this.notificationService.emit({
+      module: 'system',
+      title: 'Update Ready to Install',
+      body: `Version ${info.version} has been downloaded. Restart to apply the update.`,
+      priority: 'urgent',
+      data: {
+        action: 'update-ready',
+        version: info.version,
       },
     });
   }

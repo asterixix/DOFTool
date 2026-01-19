@@ -18,7 +18,6 @@ import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { BRAND, DOFToolLogo } from '@/shared/brand';
 
-const APP_VERSION = '0.1.0';
 const GITHUB_URL = 'https://github.com/asterixix/DOFTool';
 const SUPPORT_URL = 'https://buymeacoffee.com/asterixix';
 const AUTHOR = 'Artur Sendyka';
@@ -79,7 +78,6 @@ export function AboutDialog({ trigger, isCollapsed = false }: AboutDialogProps):
           <DialogDescription className="text-center">
             {BRAND.longName}
             <br />
-            <span className="text-xs text-muted-foreground">Version {APP_VERSION}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -112,7 +110,7 @@ export function AboutDialog({ trigger, isCollapsed = false }: AboutDialogProps):
                 <Scale className="h-4 w-4" />
                 <span>MIT License - Open Source</span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Copyright (c) 2024-2025 {AUTHOR}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Copyright (c) {AUTHOR}</p>
             </div>
 
             <Separator />

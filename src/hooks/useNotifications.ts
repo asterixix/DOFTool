@@ -92,7 +92,6 @@ export function useNotifications(): UseNotificationsReturn {
       const api = getNotificationsAPI();
       const items = await api.getHistory();
       setHistory(items);
-      setError(null);
     } catch (err) {
       console.error('[useNotifications] Failed to refresh history:', err);
       setError(err instanceof Error ? err.message : 'Failed to get notifications');
@@ -105,7 +104,6 @@ export function useNotifications(): UseNotificationsReturn {
       const api = getNotificationsAPI();
       const prefs = await api.getPreferences();
       setPreferences(prefs);
-      setError(null);
     } catch (err) {
       console.error('[useNotifications] Failed to refresh preferences:', err);
       setError(err instanceof Error ? err.message : 'Failed to get preferences');
@@ -182,6 +180,7 @@ export function useNotifications(): UseNotificationsReturn {
   useEffect(() => {
     const load = async (): Promise<void> => {
       setIsLoading(true);
+      setError(null);
       await Promise.all([refreshHistory(), refreshPreferences()]);
       setIsLoading(false);
     };

@@ -55,19 +55,33 @@ export function parseSearchQuery(query: string): {
   const excludeTerms: string[] = [];
   const requiredTerms: string[] = [];
 
-  // Split query by spaces, preserving quoted strings
-  const tokens = query.match(/"[^"]+"|\S+/g) ?? [];
+  // Split query by spaces, preserving quoted strings and prefixed quoted strings
+  // Matches: -"quoted", +"quoted", "quoted", or non-whitespace sequences
+  const tokens = query.match(/[-+]?"[^"]+"|"[^"]+"|\S+/g) ?? [];
 
   for (const token of tokens) {
-    if (token.startsWith('-')) {
-      // Exclude term
-      excludeTerms.push(token.slice(1).replace(/^"|"$/g, ''));
-    } else if (token.startsWith('+')) {
-      // Required term
-      requiredTerms.push(token.slice(1).replace(/^"|"$/g, ''));
+    if (token.startsWith('-"') || token.startsWith('-')) {
+      // Exclude term - handle both -"quoted" and -unquoted
+      const content = token.startsWith('-"')
+        ? token.slice(2, -1) // Remove -" and trailing "
+        : token.slice(1).replace(/^"|"$/g, '');
+      if (content) {
+        excludeTerms.push(content);
+      }
+    } else if (token.startsWith('+"') || token.startsWith('+')) {
+      // Required term - handle both +"quoted" and +unquoted
+      const content = token.startsWith('+"')
+        ? token.slice(2, -1) // Remove +" and trailing "
+        : token.slice(1).replace(/^"|"$/g, '');
+      if (content) {
+        requiredTerms.push(content);
+      }
     } else {
       // Regular term
-      terms.push(token.replace(/^"|"$/g, ''));
+      const content = token.replace(/^"|"$/g, '');
+      if (content) {
+        terms.push(content);
+      }
     }
   }
 

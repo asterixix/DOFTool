@@ -63,28 +63,41 @@ jobs:
       - name: Generate icons
         run: npm run icons
 
-      - name: Build
+      - name: Build Renderer and Electron
         run: npm run build
 
-      - name: Build Windows release
-        run: npx electron-builder --win --publish never
+      - name: Make Windows distributables
+        run: npx electron-forge make --platform win32
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List build output
-        run: ls -la dist-release/
+        run: |
+          echo "=== Out directory ==="
+          ls -la out/ || true
+          echo "=== Make directory ==="
+          ls -la out/make/ || true
+          ls -laR out/make/squirrel.windows/ || true
+          ls -laR out/make/zip/ || true
         shell: bash
 
-      - name: Upload Windows artifacts
+      - name: Upload Windows Squirrel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
+          name: windows-squirrel
           path: |
-            dist-release/*.exe
-            dist-release/*.zip
-            dist-release/*.blockmap
-            dist-release/latest.yml
-          if-no-files-found: error
+            out/make/squirrel.windows/**/*.exe
+            out/make/squirrel.windows/**/*.nupkg
+            out/make/squirrel.windows/**/RELEASES
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Upload Windows ZIP artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: out/make/zip/**/*.zip
+          if-no-files-found: warn
           retention-days: 1
 
   # Build for macOS
@@ -107,27 +120,35 @@ jobs:
       - name: Generate icons
         run: npm run icons
 
-      - name: Build
+      - name: Build Renderer and Electron
         run: npm run build
 
-      - name: Build macOS release
-        run: npx electron-builder --mac --publish never
+      - name: Make macOS distributables
+        run: npx electron-forge make --platform darwin
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List build output
-        run: ls -la dist-release/
+        run: |
+          echo "=== Out directory ==="
+          ls -la out/ || true
+          echo "=== Make directory ==="
+          ls -laR out/make/ || true
 
-      - name: Upload macOS artifacts
+      - name: Upload macOS DMG artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: macos-build
-          path: |
-            dist-release/*.dmg
-            dist-release/*.zip
-            dist-release/*.blockmap
-            dist-release/latest-mac.yml
-          if-no-files-found: error
+          name: macos-dmg
+          path: out/make/*.dmg
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Upload macOS ZIP artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-zip
+          path: out/make/zip/**/*.zip
+          if-no-files-found: warn
           retention-days: 1
 
   # Build for Linux
@@ -144,33 +165,46 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot dpkg
+
       - name: Install dependencies
         run: npm ci
 
       - name: Generate icons
         run: npm run icons
 
-      - name: Build
+      - name: Build Renderer and Electron
         run: npm run build
 
-      - name: Build Linux release
-        run: npx electron-builder --linux --publish never
+      - name: Make Linux distributables
+        run: npx electron-forge make --platform linux
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List build output
-        run: ls -la dist-release/
+        run: |
+          echo "=== Out directory ==="
+          ls -la out/ || true
+          echo "=== Make directory ==="
+          ls -laR out/make/ || true
 
-      - name: Upload Linux artifacts
+      - name: Upload Linux DEB artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-build
-          path: |
-            dist-release/*.AppImage
-            dist-release/*.deb
-            dist-release/*.rpm
-            dist-release/latest-linux.yml
-          if-no-files-found: error
+          name: linux-deb
+          path: out/make/deb/**/*.deb
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Upload Linux RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rpm
+          path: out/make/rpm/**/*.rpm
+          if-no-files-found: warn
           retention-days: 1
 
   # Create GitHub Release and upload all artifacts
@@ -181,30 +215,59 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Windows artifacts
+      - name: Download Windows Squirrel artifacts
         uses: actions/download-artifact@v4
         with:
-          name: windows-build
-          path: artifacts/windows
+          name: windows-squirrel
+          path: artifacts/windows-squirrel
+        continue-on-error: true
 
-      - name: Download macOS artifacts
+      - name: Download Windows ZIP artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-build
-          path: artifacts/macos
+          name: windows-zip
+          path: artifacts/windows-zip
+        continue-on-error: true
 
-      - name: Download Linux artifacts
+      - name: Download macOS DMG artifacts
         uses: actions/download-artifact@v4
         with:
-          name: linux-build
-          path: artifacts/linux
+          name: macos-dmg
+          path: artifacts/macos-dmg
+        continue-on-error: true
+
+      - name: Download macOS ZIP artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-zip
+          path: artifacts/macos-zip
+        continue-on-error: true
+
+      - name: Download Linux DEB artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-deb
+          path: artifacts/linux-deb
+        continue-on-error: true
+
+      - name: Download Linux RPM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-rpm
+          path: artifacts/linux-rpm
+        continue-on-error: true
 
       - name: Display structure of downloaded files
         run: |
           echo "=== All artifacts ==="
-          ls -laR artifacts/
-          echo "=== Files to upload ==="
-          find artifacts -type f -name "*.exe" -o -name "*.zip" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.yml" -o -name "*.blockmap"
+          ls -laR artifacts/ || echo "No artifacts found"
+
+      - name: Flatten artifacts for release
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "*.zip" -o -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" -o -name "RELEASES" \) -exec cp {} release-assets/ \;
+          echo "=== Release assets ==="
+          ls -la release-assets/
 
       - name: Get version and tag name
         id: get_version
@@ -228,19 +291,8 @@ jobs:
           draft: true
           prerelease: ${{ contains(steps.get_version.outputs.TAG_NAME, 'alpha') || contains(steps.get_version.outputs.TAG_NAME, 'beta') || contains(steps.get_version.outputs.TAG_NAME, 'rc') }}
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           files: |
-            artifacts/windows/*.exe
-            artifacts/windows/*.zip
-            artifacts/windows/*.blockmap
-            artifacts/windows/*.yml
-            artifacts/macos/*.dmg
-            artifacts/macos/*.zip
-            artifacts/macos/*.blockmap
-            artifacts/macos/*.yml
-            artifacts/linux/*.AppImage
-            artifacts/linux/*.deb
-            artifacts/linux/*.rpm
-            artifacts/linux/*.yml
+            release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

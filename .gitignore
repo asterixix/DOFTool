@@ -75,6 +75,13 @@ pids/
 # Electron
 *.asar
 
+# Electron Forge output
+out/
+.webpack/
+
+# Electron Builder legacy (can be removed)
+dist-release/
+
 # Application data (development)
 data/
 *.leveldb/

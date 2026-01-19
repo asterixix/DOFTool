@@ -47,7 +47,7 @@ export function createEvent(data: Omit<CalendarEvent, 'id'>): CalendarEvent {
 type CalendarEvent = {
   id: any;
   title: string;
-}
+};
 
 export function createEvent(data) {
   return { ...data, id: crypto.randomUUID() };
@@ -66,13 +66,13 @@ export function createEvent(data) {
 // Good - Component with extracted logic
 export function CalendarView(): JSX.Element {
   const { events, selectedDate, handleDateSelect } = useCalendarView();
-  
+
   return (
     <div className="calendar-container">
       <CalendarHeader date={selectedDate} />
-      <CalendarGrid 
-        events={events} 
-        onDateSelect={handleDateSelect} 
+      <CalendarGrid
+        events={events}
+        onDateSelect={handleDateSelect}
       />
     </div>
   );
@@ -160,12 +160,12 @@ export const IPC_CHANNELS = {
   FAMILY_CREATE: 'family:create',
   FAMILY_JOIN: 'family:join',
   FAMILY_LEAVE: 'family:leave',
-  
+
   // Calendar
   CALENDAR_SYNC: 'calendar:sync',
   CALENDAR_IMPORT: 'calendar:import',
   CALENDAR_EXPORT: 'calendar:export',
-  
+
   // Email
   EMAIL_FETCH: 'email:fetch',
   EMAIL_SEND: 'email:send',
@@ -284,7 +284,7 @@ describe('dateHelpers', () => {
 - Use accessible queries (getByRole, getByLabelText)
 - Test error states and loading states
 
-```typescript
+````typescript
 // CalendarGrid.test.tsx
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -294,20 +294,323 @@ describe('CalendarGrid', () => {
   it('should highlight selected date', async () => {
     const user = userEvent.setup();
     render(<CalendarGrid events={[]} onDateSelect={vi.fn()} />);
-    
+
     await user.click(screen.getByRole('button', { name: /january 15/i }));
-    
+
     expect(screen.getByRole('button', { name: /january 15/i }))
       .toHaveClass('selected');
   });
 });
-```
 
 ### E2E Tests (Playwright)
 
 - Test critical user flows end-to-end
 - Test offline functionality
 - Test sync between multiple windows
+
+## Unit Test Notes (Electron Services)
+
+- **Vitest `vi.mock` hoisting**
+  - `vi.mock()` is hoisted. Avoid referencing top-level variables inside a mock factory (can cause `Cannot access ... before initialization`).
+  - Prefer defining the mock object inside the `vi.mock` factory and returning it.
+
+- **Timers (`vi.useFakeTimers`) vs Node globals**
+  - Be careful enabling fake timers in tests for services that rely on real `setTimeout`/`setInterval` (retry/backoff logic).
+  - In `YjsService` tests, fake timers led to `TypeError: setTimeout is not a function`. Prefer real timers or tightly scoped fake timers with explicit `vi.useRealTimers()` cleanup.
+
+- **LevelDB iteration APIs**
+  - `StorageService.getKeysByPrefix` relies on `db.keys({ gte, lt })` returning an async iterable.
+  - Mock `keys()` using `[Symbol.asyncIterator]`.
+  - ESLint may complain about `async generator has no await`; consider implementing an async iterator via `Symbol.asyncIterator: () => ({ next: async () => ... })` instead of `async function*` when needed.
+
+- **Yjs + y-leveldb persistence + lock files**
+  - `YjsService.initialize()` may attempt stale lock removal and retry (with sleep). Tests should expect retries and ensure proper cleanup (`close()`) to avoid leaking timers.
+  - Prefer using a real `Y.Doc` in tests for CRDT merge behavior; mock only persistence + filesystem.
+
+- **`libsodium-wrappers` + Vitest ESM resolution**
+  - `libsodium-wrappers` ESM import can fail under Vitest (`Cannot find module ... libsodium.mjs`).
+  - Prefer unit tests with a `libsodium-wrappers` mock (factory-inline) unless the toolchain is adjusted to support that ESM build.
+
+- **Mock typing + lint**
+  - Avoid `any` in mocks; use explicit interfaces/types for callback signatures (e.g., `https.get` callbacks).
+  - `@typescript-eslint/unbound-method` can trigger when passing around mock methods; prefer arrow functions for mocked methods or bind explicitly.
+  - Keep import groups separated by an empty line to satisfy lint.
+
+---
+
+## Sync Service Unit Testing Patterns
+
+When testing P2P sync services, use these established patterns:
+
+#### Mock Factory Pattern for Complex Objects
+
+Create factory functions that return fresh mock instances with event simulation helpers:
+
+```typescript
+// WebRTC/DataChannel mock with event triggers
+function createMockDataChannel(): DataChannelLike & {
+  _triggerOpen: () => void;
+  _triggerMessage: (data: string) => void;
+} {
+  const handlers = new Map<string, EventListener>();
+  const channel = {
+    send: vi.fn(),
+    close: vi.fn(),
+    readyState: 'connecting' as RTCDataChannelState,
+    addEventListener: vi.fn((event: string, handler: EventListener) => {
+      handlers.set(event, handler);
+    }),
+    // Event simulation helpers
+    _triggerOpen: () => {
+      channel.readyState = 'open';
+      handlers.get('open')?.({} as Event);
+    },
+    _triggerMessage: (data: string) => {
+      handlers.get('message')?.({ data } as MessageEvent);
+    },
+  };
+  return channel;
+}
+````
+
+#### Yjs Mocking Requirements
+
+When mocking Yjs, include all commonly used functions:
+
+```typescript
+vi.mock('yjs', () => ({
+  Doc: vi.fn(() => mockYDoc),
+  encodeStateAsUpdate: vi.fn(() => new Uint8Array([1, 2, 3])),
+  encodeStateVector: vi.fn(() => new Uint8Array([1])),
+  applyUpdate: vi.fn(),
+  mergeUpdates: vi.fn((updates: Uint8Array[]) => new Uint8Array(updates[0] ?? [])),
+}));
+```
+
+#### Awareness Protocol Mocking
+
+Include all required methods for y-protocols/awareness:
+
+```typescript
+const mockAwareness = {
+  setLocalState: vi.fn(),
+  setLocalStateField: vi.fn(),
+  getLocalState: vi.fn(() => ({})),
+  getStates: vi.fn(() => new Map()),
+  on: vi.fn(),
+  off: vi.fn(),
+  destroy: vi.fn(),
+  clientID: 12345,
+};
+```
+
+#### bonjour-service Mocking for mDNS
+
+```typescript
+function createMockBrowser(): EventEmitter & { stop: Mock } {
+  const browser = new EventEmitter();
+  (browser as EventEmitter & { stop: Mock }).stop = vi.fn();
+  return browser as EventEmitter & { stop: Mock };
+}
+
+vi.mock('bonjour-service', () => ({
+  Bonjour: vi.fn(() => ({
+    publish: vi.fn(() => ({ stop: vi.fn() })),
+    find: vi.fn(() => mockBrowser),
+    destroy: vi.fn(),
+  })),
+}));
+```
+
+#### TCP Socket/Server Mocking
+
+```typescript
+function createMockSocket(): Socket & EventEmitter {
+  const socket = new EventEmitter() as Socket & EventEmitter;
+  socket.write = vi.fn(() => true);
+  socket.destroy = vi.fn();
+  socket.setEncoding = vi.fn();
+  return socket;
+}
+```
+
+#### Test File Import Order
+
+Always organize test imports following project conventions:
+
+```typescript
+// 1. Node built-ins
+import { EventEmitter } from 'events';
+
+// 2. Test framework
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// 3. Module under test
+import { ServiceUnderTest } from './ServiceUnderTest';
+
+// 4. Types
+import type { SomeType } from './Types';
+```
+
+#### Common Testing Pitfalls
+
+- **Async tests**: Use promises instead of `done()` callback (deprecated in Vitest)
+- **Mock calls typing**: Cast mock.calls to specific types: `(mock.calls[0] as [ArgType])[0]`
+- **ESLint unbound-method**: False positives with mocks - add `// eslint-disable-next-line` when needed
+- **EventEmitter mocks**: Extend from Node's EventEmitter for proper event simulation
+- **Module mocks**: Place `vi.mock()` calls before describe blocks (hoisted but clearer)
+
+---
+
+## React Component Unit Testing Notes
+
+### Known jsdom Limitations
+
+When writing unit tests with Vitest and jsdom for React components:
+
+1. **Radix UI Select/Popover components**: `userEvent.click()` on Select triggers causes `TypeError: target.hasPointerCapture is not a function`. Avoid testing Select interactions directly; instead test that the Select renders correctly.
+
+2. **Virtual scrolling (`@tanstack/react-virtual`)**: Not fully simulated in jsdom. Test list rendering without relying on virtualization behavior.
+
+3. **Pointer events**: jsdom doesn't support `hasPointerCapture`, `setPointerCapture`, `releasePointerCapture`. Add to setup if needed:
+   ```typescript
+   Element.prototype.hasPointerCapture = vi.fn(() => false);
+   Element.prototype.setPointerCapture = vi.fn();
+   Element.prototype.releasePointerCapture = vi.fn();
+   ```
+
+### Component Test Structure
+
+```typescript
+/**
+ * ComponentName - Unit tests
+ */
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { ComponentName } from './ComponentName';
+import type { SomeType } from './types';
+
+// Mock data with full type compliance
+const mockData: SomeType = {
+  /* all required properties */
+};
+
+// Module mocks (hoisted)
+vi.mock('./hooks/useSomething', () => ({
+  useSomething: vi.fn(() => ({ data: mockData, isLoading: false })),
+}));
+
+describe('ComponentName', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('rendering', () => {
+    /* ... */
+  });
+  describe('user interactions', () => {
+    /* ... */
+  });
+  describe('edge cases', () => {
+    /* ... */
+  });
+});
+```
+
+### Type-Safe Mock Data
+
+Always include **all required properties** when creating mock data to avoid TypeScript errors:
+
+```typescript
+// Example: EmailAccountSettings mock with all nested properties
+const mockAccount: EmailAccountSettings = {
+  id: 'acc-1',
+  email: 'test@example.com',
+  displayName: 'Test',
+  provider: 'gmail',
+  incoming: {
+    protocol: 'imap',
+    host: 'imap.gmail.com',
+    port: 993,
+    encryption: 'ssl',
+    authMethod: 'password',
+    username: 'test@example.com',
+    password: undefined,
+    timeout: 30000,
+    retry: { maxAttempts: 3, delay: 1000, backoffMultiplier: 2 },
+  },
+  outgoing: {
+    host: 'smtp.gmail.com',
+    port: 587,
+    encryption: 'tls',
+    authMethod: 'password',
+    username: 'test@example.com',
+    password: undefined,
+    timeout: 30000,
+    retry: { maxAttempts: 3, delay: 1000, backoffMultiplier: 2 },
+    rateLimit: { maxPerMinute: 30, maxPerHour: 500 },
+  },
+  syncInterval: 15,
+  status: 'active',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
+```
+
+### Hook Mocking Patterns
+
+```typescript
+// Static mock (same for all tests in file)
+vi.mock('../../hooks/useEmail', () => ({
+  useEmail: vi.fn(() => ({
+    accounts: mockAccounts,
+    messages: mockMessages,
+    isLoading: false,
+    error: null,
+  })),
+}));
+
+// Dynamic mock (change per test)
+import { useEmail } from '../../hooks/useEmail';
+
+it('should show loading state', () => {
+  vi.mocked(useEmail).mockReturnValue({
+    accounts: [],
+    messages: [],
+    isLoading: true,
+    error: null,
+  });
+  render(<Component />);
+  expect(screen.getByRole('progressbar')).toBeInTheDocument();
+});
+```
+
+### Testing Async Operations
+
+```typescript
+// Use waitFor for async state changes
+await waitFor(() => {
+  expect(mockCallback).toHaveBeenCalled();
+});
+
+// Use findBy* for elements that appear asynchronously
+const element = await screen.findByText('Success');
+
+// Always use user.setup() for userEvent
+const user = userEvent.setup();
+await user.click(button);
+await user.type(input, 'text');
+```
+
+### Avoiding Common Pitfalls
+
+- **Don't test Select/Combobox interactions** in jsdom - test that they render
+- **Don't rely on `require()` for dynamic mocks** - causes lint errors and type issues
+- **Include all nested object properties** in mock data to satisfy TypeScript
+- **Use `vi.clearAllMocks()` in `beforeEach`** to reset mock state between tests
+- **Prefer `screen.getByRole`** over `getByTestId` for accessibility-focused tests
 
 ---
 
@@ -333,7 +636,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 
 function AnimatedCard({ children }: { children: React.ReactNode }) {
   const shouldReduceMotion = useReducedMotion();
-  
+
   return (
     <motion.div
       initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}

@@ -476,6 +476,20 @@ export class YjsSyncProvider extends EventEmitter {
   }
 
   /**
+   * Get all connected peer IDs
+   */
+  getPeers(): string[] {
+    return Array.from(this.peers.keys());
+  }
+
+  /**
+   * Update local awareness state (alias for setAwarenessState)
+   */
+  updateAwarenessState(state: Partial<AwarenessState>): void {
+    this.setAwarenessState(state);
+  }
+
+  /**
    * Get all synced peer IDs
    */
   getSyncedPeerIds(): string[] {
@@ -518,6 +532,13 @@ export class YjsSyncProvider extends EventEmitter {
     // Flush any pending updates before destroying
     if (this.pendingUpdates.length > 0) {
       this.debouncedBroadcastUpdate?.flush();
+    }
+
+    // Close all peer data channels
+    for (const [_, peer] of this.peers) {
+      if (peer.channel.readyState === 'open') {
+        peer.channel.close();
+      }
     }
 
     // Remove listeners from ydoc

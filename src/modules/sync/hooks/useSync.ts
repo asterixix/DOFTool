@@ -281,29 +281,35 @@ export function useSync(): UseSyncReturn {
       // Initial refresh and try to initialize if needed
       // eslint-disable-next-line no-console
       console.log('[useSync] Performing initial status refresh...');
-      void refreshStatus().then(async () => {
-        // If not initialized, try to initialize
-        const api = getSyncAPI();
-        const status = await api.getStatus();
-        if (!status.isInitialized) {
-          // eslint-disable-next-line no-console
-          console.log('[useSync] Sync not initialized, attempting to initialize...');
+      void refreshStatus()
+        .then(async () => {
+          // If not initialized, try to initialize
           try {
-            const result = await api.initialize();
-            if (result.success) {
+            const api = getSyncAPI();
+            const status = await api.getStatus();
+            if (!status.isInitialized) {
               // eslint-disable-next-line no-console
-              console.log('[useSync] Sync initialization triggered successfully');
-              // Refresh status after initialization
-              setTimeout(() => void refreshStatus(), 1000);
-            } else {
-              console.error('[useSync] Sync initialization failed:', result.error);
+              console.log('[useSync] Sync not initialized, attempting to initialize...');
+              const result = await api.initialize();
+              if (result.success) {
+                // eslint-disable-next-line no-console
+                console.log('[useSync] Sync initialization triggered successfully');
+                // Refresh status after initialization
+                setTimeout(() => void refreshStatus(), 1000);
+              } else {
+                console.error('[useSync] Sync initialization failed:', result.error);
+              }
             }
           } catch (error) {
-            console.error('[useSync] Error calling initialize:', error);
+            console.error('[useSync] Error during initialization check:', error);
           }
-        }
+        })
+        .catch((error) => {
+          console.error('[useSync] Error during initial refresh:', error);
+        });
+      void refreshPeers().catch((error) => {
+        console.error('[useSync] Error during initial peers refresh:', error);
       });
-      void refreshPeers();
     } else {
       // Update the store instance to current one
       syncStoreInstanceRef.current = store;

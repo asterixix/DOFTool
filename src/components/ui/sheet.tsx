@@ -2,7 +2,7 @@ import * as React from 'react';
 
 import * as SheetPrimitive from '@radix-ui/react-dialog';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/lib/utils';
 
 const Sheet = SheetPrimitive.Root;
 const SheetTrigger = SheetPrimitive.Trigger;

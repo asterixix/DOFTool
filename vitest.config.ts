@@ -8,7 +8,11 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/**/*.{test,spec}.{ts,tsx}'],
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'tests/**/*.{test,spec}.{ts,tsx}',
+      'electron/**/*.{test,spec}.{ts,tsx}',
+    ],
     exclude: ['node_modules', 'dist', 'tests/e2e'],
     coverage: {
       provider: 'v8',
@@ -20,6 +24,9 @@ export default defineConfig({
         '**/*.config.*',
         '**/index.ts',
         'src/shared/components/ui/**',
+        'src/components/ui/**',
+        'dist/electron/**',
+        '.eslintrc.cjs',
       ],
       thresholds: {
         global: {
@@ -34,10 +41,11 @@ export default defineConfig({
     hookTimeout: 10000,
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@/modules': path.resolve(__dirname, './src/modules'),
-      '@/shared': path.resolve(__dirname, './src/shared'),
-    },
+    alias: [
+      { find: '@/lib', replacement: path.resolve(__dirname, './src/shared/lib') },
+      { find: '@/modules', replacement: path.resolve(__dirname, './src/modules') },
+      { find: '@/shared', replacement: path.resolve(__dirname, './src/shared') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+    ],
   },
 });

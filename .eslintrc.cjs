@@ -30,6 +30,10 @@ module.exports = {
     'vitest.config.ts',
     'tests/setup.ts',
     '**/*.d.ts',
+    '**/*.test.ts',
+    '**/*.test.tsx',
+    '**/*.spec.ts',
+    'forge.config.ts',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {

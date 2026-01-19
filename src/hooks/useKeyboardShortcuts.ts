@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { moveFocus } from '@/lib/utils';
+import { moveFocus } from '@/shared/lib/utils';
 
 interface KeyboardShortcutsOptions {
   onViewChange?: (view: 'day' | 'week' | 'month' | 'agenda' | 'list' | 'board') => void;
@@ -33,11 +33,14 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions): void {
   };
 
   const isFormField = (element: HTMLElement): boolean => {
+    if (!element?.tagName) {
+      return false;
+    }
     return (
       element.tagName === 'INPUT' ||
       element.tagName === 'TEXTAREA' ||
       element.isContentEditable ||
-      element.closest('[role="textbox"]') !== null
+      (typeof element.closest === 'function' && element.closest('[role="textbox"]') !== null)
     );
   };
 
