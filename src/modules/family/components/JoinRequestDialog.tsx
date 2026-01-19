@@ -48,15 +48,47 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
 
-  // Poll for pending join requests if admin
+  // Always listen for new join requests (regardless of isAdmin status)
+  // This ensures we don't miss events due to timing issues with family data loading
+  useEffect(() => {
+    console.log('[JoinRequestDialog] Setting up join request listener');
+
+    const unsubscribe = window.electronAPI.discovery.onNewJoinRequest((request) => {
+      console.log('[JoinRequestDialog] Received new join request:', request);
+      setPendingRequests((prev) => {
+        // Avoid duplicates
+        if (prev.some((r) => r.id === request.id)) {
+          return prev;
+        }
+        return [...prev, request];
+      });
+
+      // Show dialog for the new request if not already showing one
+      if (!currentRequest) {
+        setCurrentRequest(request);
+        setShowDialog(true);
+      }
+    });
+
+    return () => {
+      console.log('[JoinRequestDialog] Cleaning up join request listener');
+      unsubscribe();
+    };
+  }, [currentRequest]);
+
+  // Poll for pending join requests (runs when isAdmin becomes true)
   useEffect(() => {
     if (!isAdmin) {
+      console.log('[JoinRequestDialog] Not admin, skipping poll setup');
       return;
     }
+
+    console.log('[JoinRequestDialog] Admin detected, setting up polling');
 
     const checkRequests = async (): Promise<void> => {
       try {
         const requests = await window.electronAPI.discovery.getPendingJoinRequests();
+        console.log('[JoinRequestDialog] Polled pending requests:', requests.length);
         setPendingRequests(requests);
 
         // If there are new requests, show the dialog
@@ -76,30 +108,14 @@ export function JoinRequestDialog({ isAdmin }: JoinRequestDialogProps): JSX.Elem
     return () => clearInterval(intervalId);
   }, [isAdmin, currentRequest]);
 
-  // Listen for new join requests
+  // When isAdmin changes to true and we have pending requests, show dialog
   useEffect(() => {
-    if (!isAdmin) {
-      return;
+    if (isAdmin && pendingRequests.length > 0 && !currentRequest) {
+      console.log('[JoinRequestDialog] Admin with pending requests, showing dialog');
+      setCurrentRequest(pendingRequests[0] ?? null);
+      setShowDialog(true);
     }
-
-    const unsubscribe = window.electronAPI.discovery.onNewJoinRequest((request) => {
-      setPendingRequests((prev) => {
-        // Avoid duplicates
-        if (prev.some((r) => r.id === request.id)) {
-          return prev;
-        }
-        return [...prev, request];
-      });
-
-      // Show dialog for the new request if not already showing one
-      if (!currentRequest) {
-        setCurrentRequest(request);
-        setShowDialog(true);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [isAdmin, currentRequest]);
+  }, [isAdmin, pendingRequests, currentRequest]);
 
   const handleApprove = async (): Promise<void> => {
     if (!currentRequest) {
