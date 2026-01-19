@@ -8,12 +8,12 @@ import type { shell as ElectronShell, app as ElectronApp } from 'electron';
 import type { autoUpdater } from 'electron-updater';
 import type { RequestOptions } from 'https';
 
-// electron-updater types
-interface UpdateInfo {
+// electron-updater types for event payloads
+interface UpdateEventInfo {
   version: string;
-  releaseNotes?: string | ReleaseNoteInfo[];
-  releaseName?: string;
-  releaseDate: string;
+  releaseNotes?: string | ReleaseNoteInfo[] | null;
+  releaseName?: string | null;
+  releaseDate?: string;
 }
 
 interface ReleaseNoteInfo {
@@ -63,7 +63,7 @@ export class AutoUpdaterService {
   private shell?: typeof ElectronShell;
   private app?: typeof ElectronApp;
   private autoUpdater: typeof autoUpdater | null = null;
-  private updateAvailable: UpdateInfo | null = null;
+  private updateAvailable: UpdateEventInfo | null = null;
   private downloadProgress: number = 0;
   private isDownloading: boolean = false;
   private isUpdateDownloaded: boolean = false;
@@ -105,13 +105,13 @@ export class AutoUpdaterService {
         console.log('[AutoUpdater] Checking for updates...');
       });
 
-      autoUpdater.on('update-available', (info: UpdateInfo) => {
+      autoUpdater.on('update-available', (info: UpdateEventInfo) => {
         console.log('[AutoUpdater] Update available:', info.version);
         this.updateAvailable = info;
         void this.notifyUpdateAvailable(info);
       });
 
-      autoUpdater.on('update-not-available', (_info: UpdateInfo) => {
+      autoUpdater.on('update-not-available', (_info: UpdateEventInfo) => {
         console.log('[AutoUpdater] No updates available');
       });
 
@@ -120,7 +120,7 @@ export class AutoUpdaterService {
         console.log(`[AutoUpdater] Download progress: ${Math.round(progress.percent)}%`);
       });
 
-      autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+      autoUpdater.on('update-downloaded', (info: UpdateEventInfo) => {
         console.log('[AutoUpdater] Update downloaded:', info.version);
         this.isDownloading = false;
         this.isUpdateDownloaded = true;
@@ -170,13 +170,23 @@ export class AutoUpdaterService {
           if (result?.updateInfo) {
             const hasUpdate = this.isNewerVersion(result.updateInfo.version, this.currentVersion);
 
+            // Emit notification if update is available and notification is requested
+            if (hasUpdate && notifyIfAvailable) {
+              await this.notifyUpdateAvailable({
+                version: result.updateInfo.version,
+                releaseNotes: this.formatReleaseNotes(result.updateInfo.releaseNotes ?? undefined),
+                releaseName: result.updateInfo.releaseName ?? undefined,
+                releaseDate: result.updateInfo.releaseDate ?? undefined,
+              });
+            }
+
             return {
               version: result.updateInfo.version,
               currentVersion: this.currentVersion,
               hasUpdate,
-              releaseNotes: this.formatReleaseNotes(result.updateInfo.releaseNotes),
-              releaseName: result.updateInfo.releaseName,
-              releaseDate: result.updateInfo.releaseDate,
+              releaseNotes: this.formatReleaseNotes(result.updateInfo.releaseNotes ?? undefined),
+              releaseName: result.updateInfo.releaseName ?? undefined,
+              releaseDate: result.updateInfo.releaseDate ?? undefined,
             };
           }
         } catch (autoUpdaterError) {
@@ -391,28 +401,20 @@ export class AutoUpdaterService {
     });
   }
 
-  private formatReleaseNotes(notes: string | ReleaseNoteInfo[] | undefined): string | undefined {
-    if (!notes) {
+  private formatReleaseNotes(releaseNotes?: string | ReleaseNoteInfo[]): string | undefined {
+    if (!releaseNotes) {
       return undefined;
     }
 
-    if (typeof notes === 'string') {
-      return notes;
+    if (typeof releaseNotes === 'string') {
+      return releaseNotes;
     }
 
-    // Handle array of release notes
-    return notes
-      .map((note) => {
-        if (note.note) {
-          return `## ${note.version}\n${note.note}`;
-        }
-        return `## ${note.version}`;
-      })
-      .join('\n\n');
+    return releaseNotes.map((note) => `## ${note.version}\n${note.note ?? ''}`).join('\n\n');
   }
 
-  private async notifyUpdateAvailable(info: UpdateInfo): Promise<void> {
-    const releaseNotes = this.formatReleaseNotes(info.releaseNotes);
+  private async notifyUpdateAvailable(info: UpdateEventInfo): Promise<void> {
+    const releaseNotes = this.formatReleaseNotes(info.releaseNotes ?? undefined);
     const truncatedNotes =
       releaseNotes && releaseNotes.length > 200
         ? releaseNotes.substring(0, 200) + '...'
@@ -432,16 +434,12 @@ export class AutoUpdaterService {
     });
   }
 
-  private async notifyUpdateReady(info: UpdateInfo): Promise<void> {
+  private async notifyUpdateReady(info: UpdateEventInfo): Promise<void> {
     await this.notificationService.emit({
       module: 'system',
-      title: 'Update Ready to Install',
-      body: `Version ${info.version} has been downloaded. Restart to apply the update.`,
-      priority: 'urgent',
-      data: {
-        action: 'update-ready',
-        version: info.version,
-      },
+      title: 'Update Ready',
+      body: `Version ${info.version} has been downloaded and will be installed on exit.`,
+      priority: 'normal',
     });
   }
 }

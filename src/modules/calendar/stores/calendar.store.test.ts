@@ -5,6 +5,62 @@ import { useCalendarStore } from './calendar.store';
 
 import type { Calendar, CalendarEvent, ExpandedEvent } from '../types/Calendar.types';
 
+// Helper to create test calendar with all required properties
+const createTestCalendar = (overrides: Partial<Calendar> = {}): Calendar => ({
+  id: 'cal-1',
+  familyId: 'family-1',
+  name: 'Test Calendar',
+  description: undefined,
+  color: 'blue',
+  icon: undefined,
+  ownerId: 'user-1',
+  ownerName: undefined,
+  visibility: 'family',
+  defaultPermission: 'view',
+  sharedWith: [],
+  defaultReminders: [],
+  timezone: 'UTC',
+  showDeclined: undefined,
+  externalSyncEnabled: undefined,
+  externalSource: undefined,
+  lastSyncAt: undefined,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  ...overrides,
+});
+
+// Helper to create test event with all required properties
+const createTestEvent = (overrides: Partial<CalendarEvent> = {}): CalendarEvent => ({
+  id: 'event-1',
+  calendarId: 'cal-1',
+  familyId: 'family-1',
+  title: 'Test Event',
+  description: undefined,
+  location: undefined,
+  url: undefined,
+  start: Date.now(),
+  end: Date.now() + 3600000,
+  allDay: false,
+  timezone: 'UTC',
+  recurrence: undefined,
+  recurrenceId: undefined,
+  originalStart: undefined,
+  status: 'confirmed',
+  busyStatus: 'busy',
+  category: undefined,
+  color: undefined,
+  organizer: undefined,
+  attendees: [],
+  reminders: [],
+  createdBy: 'user-1',
+  lastModifiedBy: undefined,
+  externalId: undefined,
+  externalEtag: undefined,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  ...overrides,
+});
+
 describe('calendar.store', () => {
   beforeEach(() => {
     const { reset } = useCalendarStore.getState();
@@ -50,20 +106,10 @@ describe('calendar.store', () => {
   describe('setters', () => {
     it('should set calendars', () => {
       const calendars: Calendar[] = [
-        {
+        createTestCalendar({
           id: 'cal-1',
-          familyId: 'family-1',
           name: 'Work',
-          color: 'blue',
-          ownerId: 'user-1',
-          visibility: 'family',
-          defaultPermission: 'view',
-          sharedWith: [],
-          defaultReminders: [],
-          timezone: 'UTC',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
+        }),
       ];
 
       const { setCalendars } = useCalendarStore.getState();
@@ -76,21 +122,10 @@ describe('calendar.store', () => {
 
     it('should set events', () => {
       const events: CalendarEvent[] = [
-        {
+        createTestEvent({
           id: 'event-1',
-          calendarId: 'cal-1',
           title: 'Test Event',
-          start: Date.now(),
-          end: Date.now() + 3600000,
-          allDay: false,
-          timezone: 'UTC',
-          status: 'confirmed',
-          busyStatus: 'busy',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          familyId: 'family-1',
-          createdBy: 'user-1',
-        },
+        }),
       ];
 
       const { setEvents } = useCalendarStore.getState();
@@ -104,20 +139,11 @@ describe('calendar.store', () => {
     it('should set expanded events', () => {
       const expandedEvents: ExpandedEvent[] = [
         {
-          id: 'event-1',
-          originalEventId: 'event-1',
-          calendarId: 'cal-1',
-          title: 'Test Event',
-          start: Date.now(),
-          end: Date.now() + 3600000,
-          allDay: false,
-          timezone: 'UTC',
-          status: 'confirmed',
-          busyStatus: 'busy',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          familyId: 'family-1',
-          createdBy: 'user-1',
+          ...createTestEvent({
+            id: 'event-1',
+            title: 'Test Event',
+          }),
+          isRecurrenceInstance: false,
         },
       ];
 
@@ -171,21 +197,10 @@ describe('calendar.store', () => {
 
   describe('editor actions', () => {
     it('should open editor with event', () => {
-      const event: CalendarEvent = {
+      const event: CalendarEvent = createTestEvent({
         id: 'event-1',
-        calendarId: 'cal-1',
         title: 'Test Event',
-        start: Date.now(),
-        end: Date.now() + 3600000,
-        allDay: false,
-        timezone: 'UTC',
-        status: 'confirmed',
-        busyStatus: 'busy',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        familyId: 'family-1',
-        createdBy: 'user-1',
-      };
+      });
 
       const { openEditor } = useCalendarStore.getState();
       act(() => {
@@ -225,20 +240,10 @@ describe('calendar.store', () => {
 
   describe('dialog actions', () => {
     it('should open share dialog', () => {
-      const calendar: Calendar = {
+      const calendar: Calendar = createTestCalendar({
         id: 'cal-1',
-        familyId: 'family-1',
         name: 'Work',
-        color: 'blue',
-        ownerId: 'user-1',
-        visibility: 'family',
-        defaultPermission: 'view',
-        sharedWith: [],
-        defaultReminders: [],
-        timezone: 'UTC',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+      });
 
       const { openShareDialog } = useCalendarStore.getState();
       act(() => {
@@ -265,20 +270,10 @@ describe('calendar.store', () => {
 
   describe('computed helpers', () => {
     it('should get calendar by id', () => {
-      const calendar: Calendar = {
+      const calendar: Calendar = createTestCalendar({
         id: 'cal-1',
-        familyId: 'family-1',
         name: 'Work',
-        color: 'blue',
-        ownerId: 'user-1',
-        visibility: 'family',
-        defaultPermission: 'view',
-        sharedWith: [],
-        defaultReminders: [],
-        timezone: 'UTC',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+      });
 
       const { setCalendars, getCalendarById } = useCalendarStore.getState();
       act(() => {
@@ -290,21 +285,10 @@ describe('calendar.store', () => {
     });
 
     it('should get event by id', () => {
-      const event: CalendarEvent = {
+      const event: CalendarEvent = createTestEvent({
         id: 'event-1',
-        calendarId: 'cal-1',
         title: 'Test Event',
-        start: Date.now(),
-        end: Date.now() + 3600000,
-        allDay: false,
-        timezone: 'UTC',
-        status: 'confirmed',
-        busyStatus: 'busy',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        familyId: 'family-1',
-        createdBy: 'user-1',
-      };
+      });
 
       const { setEvents, getEventById } = useCalendarStore.getState();
       act(() => {
@@ -317,34 +301,16 @@ describe('calendar.store', () => {
 
     it('should get visible calendars', () => {
       const calendars: Calendar[] = [
-        {
+        createTestCalendar({
           id: 'cal-1',
-          familyId: 'family-1',
           name: 'Work',
-          color: 'blue',
-          ownerId: 'user-1',
-          visibility: 'family',
-          defaultPermission: 'view',
-          sharedWith: [],
-          defaultReminders: [],
-          timezone: 'UTC',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-        {
+        }),
+        createTestCalendar({
           id: 'cal-2',
-          familyId: 'family-1',
           name: 'Personal',
           color: 'green',
-          ownerId: 'user-1',
           visibility: 'private',
-          defaultPermission: 'view',
-          sharedWith: [],
-          defaultReminders: [],
-          timezone: 'UTC',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
+        }),
       ];
 
       const { setCalendars, setSelectedCalendarIds, getVisibleCalendars } =
@@ -356,7 +322,7 @@ describe('calendar.store', () => {
 
       const visibleCalendars = getVisibleCalendars();
       expect(visibleCalendars).toHaveLength(1);
-      expect(visibleCalendars[0].id).toBe('cal-1');
+      expect(visibleCalendars[0]?.id).toBe('cal-1');
     });
 
     it('should get events for date', () => {
@@ -369,36 +335,22 @@ describe('calendar.store', () => {
 
       const expandedEvents: ExpandedEvent[] = [
         {
-          id: 'event-1',
-          originalEventId: 'event-1',
-          calendarId: 'cal-1',
-          title: 'Today Event',
-          start: today.getTime(),
-          end: today.getTime() + 3600000,
-          allDay: false,
-          timezone: 'UTC',
-          status: 'confirmed',
-          busyStatus: 'busy',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          familyId: 'family-1',
-          createdBy: 'user-1',
+          ...createTestEvent({
+            id: 'event-1',
+            title: 'Today Event',
+            start: today.getTime(),
+            end: today.getTime() + 3600000,
+          }),
+          isRecurrenceInstance: false,
         },
         {
-          id: 'event-2',
-          originalEventId: 'event-2',
-          calendarId: 'cal-1',
-          title: 'Tomorrow Event',
-          start: today.getTime() + 86400000,
-          end: today.getTime() + 86400000 + 3600000,
-          allDay: false,
-          timezone: 'UTC',
-          status: 'confirmed',
-          busyStatus: 'busy',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          familyId: 'family-1',
-          createdBy: 'user-1',
+          ...createTestEvent({
+            id: 'event-2',
+            title: 'Tomorrow Event',
+            start: today.getTime() + 86400000,
+            end: today.getTime() + 86400000 + 3600000,
+          }),
+          isRecurrenceInstance: false,
         },
       ];
 
@@ -412,7 +364,7 @@ describe('calendar.store', () => {
 
       const eventsForDate = getEventsForDate(todayStart.getTime());
       expect(eventsForDate).toHaveLength(1);
-      expect(eventsForDate[0].title).toBe('Today Event');
+      expect(eventsForDate[0]?.title).toBe('Today Event');
     });
   });
 
@@ -481,20 +433,10 @@ describe('calendar.store', () => {
 
   describe('reset', () => {
     it('should reset store to initial state', () => {
-      const calendar: Calendar = {
+      const calendar: Calendar = createTestCalendar({
         id: 'cal-1',
-        familyId: 'family-1',
         name: 'Work',
-        color: 'blue',
-        ownerId: 'user-1',
-        visibility: 'family',
-        defaultPermission: 'view',
-        sharedWith: [],
-        defaultReminders: [],
-        timezone: 'UTC',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+      });
 
       const { setCalendars, setCurrentView, setError, openEditor, reset } =
         useCalendarStore.getState();

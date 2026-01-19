@@ -283,7 +283,8 @@ describe('EmailSidebar', () => {
     });
 
     it('should not show Manage Folders button when onManageFolders is not provided', () => {
-      render(<EmailSidebar {...defaultProps} onManageFolders={undefined} />);
+      const { onManageFolders, ...propsWithoutManageFolders } = defaultProps;
+      render(<EmailSidebar {...propsWithoutManageFolders} />);
 
       expect(screen.queryByText('Manage Folders')).not.toBeInTheDocument();
     });

@@ -1,12 +1,10 @@
 import { renderHook } from '@testing-library/react';
-import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
 
 import { useBreadcrumbs } from './useBreadcrumbs';
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <BrowserRouter>{children}</BrowserRouter>
-);
+// Unused wrapper removed - using inline wrappers in tests
 
 describe('useBreadcrumbs', () => {
   it('should return home breadcrumb for root path', () => {
@@ -164,7 +162,7 @@ describe('useBreadcrumbs', () => {
     const { result } = renderHook(() => useBreadcrumbs(), { wrapper: routerWrapper });
 
     // UUID should be detected and use generic label or param
-    expect(result.current[2].label).toBeDefined();
+    expect(result.current[2]?.label).toBeDefined();
   });
 
   it('should mark only last breadcrumb as current', () => {
@@ -175,10 +173,10 @@ describe('useBreadcrumbs', () => {
     const { result } = renderHook(() => useBreadcrumbs(), { wrapper: routerWrapper });
 
     expect(result.current).toHaveLength(4);
-    expect(result.current[0].isCurrent).toBe(false);
-    expect(result.current[1].isCurrent).toBe(false);
-    expect(result.current[2].isCurrent).toBe(false);
-    expect(result.current[3].isCurrent).toBe(true);
+    expect(result.current[0]?.isCurrent).toBe(false);
+    expect(result.current[1]?.isCurrent).toBe(false);
+    expect(result.current[2]?.isCurrent).toBe(false);
+    expect(result.current[3]?.isCurrent).toBe(true);
   });
 
   it('should update breadcrumbs when route changes', () => {
@@ -190,7 +188,7 @@ describe('useBreadcrumbs', () => {
       wrapper: routerWrapper,
     });
 
-    expect(result.current[1].path).toBe('/calendar');
+    expect(result.current[1]?.path).toBe('/calendar');
 
     // Note: In a real test, we'd need to change the router's location
     // This test verifies the structure is correct

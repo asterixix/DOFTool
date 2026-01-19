@@ -181,7 +181,10 @@ describe('ReminderSchedulingService', () => {
 
     it('should filter reminders by category', async () => {
       await reminderService.updateSettings({
-        global: { categories: ['work'] },
+        global: {
+          enabled: true,
+          categories: ['work'],
+        },
       });
 
       const event = {
@@ -203,8 +206,12 @@ describe('ReminderSchedulingService', () => {
     });
 
     it('should limit reminders per event', async () => {
+      // Set max reminders to 2
       await reminderService.updateSettings({
-        global: { maxRemindersPerEvent: 2 },
+        global: {
+          enabled: true,
+          maxRemindersPerEvent: 2,
+        },
       });
 
       const event = {
@@ -255,7 +262,7 @@ describe('ReminderSchedulingService', () => {
       expect(mockNotificationService.emit).not.toHaveBeenCalled();
     });
 
-    it('should use urgent priority for reminders 5 minutes or less', () => {
+    it('should use urgent priority for reminders 5 minutes or less', async () => {
       const event = {
         id: 'event-1',
         calendarId: 'cal-1',
@@ -268,7 +275,8 @@ describe('ReminderSchedulingService', () => {
 
       reminderService.scheduleEventReminders(event);
 
-      vi.advanceTimersByTime(240001); // Advance to trigger time
+      // Wait for the timeout to trigger
+      await vi.advanceTimersByTimeAsync(240001); // Advance to trigger time
 
       expect(mockNotificationService.emit).toHaveBeenCalledWith(
         expect.objectContaining({

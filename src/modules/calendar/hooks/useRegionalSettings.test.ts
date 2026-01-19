@@ -12,17 +12,17 @@ vi.mock('@/stores/settings.store', () => ({
 
 // Mock dateFormatting utilities
 vi.mock('@/shared/utils/dateFormatting', () => ({
-  formatDateWithSettings: vi.fn((date: Date | number, format: string) => {
-    const d = typeof date === 'number' ? new Date(date) : date;
+  formatDateWithSettings: vi.fn((_date: Date | number, _format: string) => {
+    const d = typeof _date === 'number' ? new Date(_date) : _date;
     return d.toLocaleDateString();
   }),
-  formatTimeWithSettings: vi.fn((date: Date | number, format: string) => {
-    const d = typeof date === 'number' ? new Date(date) : date;
+  formatTimeWithSettings: vi.fn((_date: Date | number, _format: string) => {
+    const d = typeof _date === 'number' ? new Date(_date) : _date;
     return d.toLocaleTimeString();
   }),
   formatDateTimeWithSettings: vi.fn(
-    (date: Date | number, dateFormat: string, timeFormat: string) => {
-      const d = typeof date === 'number' ? new Date(date) : date;
+    (_date: Date | number, _dateFormat: string, _timeFormat: string) => {
+      const d = typeof _date === 'number' ? new Date(_date) : _date;
       return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
     }
   ),
@@ -32,7 +32,7 @@ vi.mock('@/shared/utils/dateFormatting', () => ({
 }));
 
 describe('useRegionalSettings', () => {
-  const mockUseSettingsStore = useSettingsStore as ReturnType<typeof vi.fn>;
+  const mockUseSettingsStore = useSettingsStore as unknown as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();

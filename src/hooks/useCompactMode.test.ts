@@ -13,7 +13,7 @@ vi.mock('@/stores/settings.store', () => ({
 }));
 
 describe('useCompactMode', () => {
-  const mockUseSettingsStore = useSettingsStore as ReturnType<typeof vi.fn>;
+  const mockUseSettingsStore = useSettingsStore as unknown as ReturnType<typeof vi.fn>;
   const rootElement = document.documentElement;
 
   beforeEach(() => {

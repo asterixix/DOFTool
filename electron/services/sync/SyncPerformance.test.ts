@@ -250,6 +250,7 @@ describe('SyncPerformance', () => {
     });
 
     it('should return active count', async () => {
+      vi.useRealTimers();
       const queue = new AsyncQueue(1);
 
       const promise = queue.add(async () => {
@@ -259,9 +260,9 @@ describe('SyncPerformance', () => {
       expect(queue.activeCount).toBeGreaterThan(0);
 
       await promise;
-      await vi.runAllTimersAsync();
 
       expect(queue.activeCount).toBe(0);
+      vi.useFakeTimers();
     });
 
     it('should handle errors', async () => {
@@ -282,6 +283,7 @@ describe('SyncPerformance', () => {
 
       expect(fn).not.toHaveBeenCalled();
 
+      await vi.advanceTimersToNextTimerAsync();
       await promise;
 
       expect(fn).toHaveBeenCalledTimes(1);
@@ -292,7 +294,10 @@ describe('SyncPerformance', () => {
         throw new Error('Test error');
       });
 
-      await expect(deferToNextTick(fn)).rejects.toThrow('Test error');
+      const promise = deferToNextTick(fn);
+      await vi.advanceTimersToNextTimerAsync();
+
+      await expect(promise).rejects.toThrow('Test error');
     });
   });
 
@@ -320,7 +325,14 @@ describe('SyncPerformance', () => {
       const items = [1, 2, 3, 4, 5];
       const processor = vi.fn((item: number) => item * 2);
 
-      const results = await processInChunks(items, processor, 2);
+      const promise = processInChunks(items, processor, 2);
+
+      // Advance timers for each chunk (3 chunks total)
+      await vi.advanceTimersToNextTimerAsync();
+      await vi.advanceTimersToNextTimerAsync();
+      await vi.advanceTimersToNextTimerAsync();
+
+      const results = await promise;
 
       expect(results).toEqual([2, 4, 6, 8, 10]);
       expect(processor).toHaveBeenCalledTimes(5);

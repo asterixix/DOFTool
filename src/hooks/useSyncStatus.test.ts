@@ -123,7 +123,7 @@ describe('useSyncStatus', () => {
   });
 
   it.skip('should auto-refresh status when familyId is provided', async () => {
-    const { result } = renderHook(() => useSyncStatus({ familyId: 'family-1', autoConnect: true }));
+    renderHook(() => useSyncStatus({ familyId: 'family-1', autoConnect: true }));
 
     await waitFor(() => {
       expect(mockRefreshStatus).toHaveBeenCalled();

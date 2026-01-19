@@ -181,7 +181,10 @@ describe('EmailSettingsSection', () => {
     it('should display badge with account count', () => {
       render(<EmailSettingsSection />);
 
-      expect(screen.getByText('1')).toBeInTheDocument();
+      // Find the badge within the "My Accounts" tab
+      const myAccountsTab = screen.getByRole('tab', { name: /My Accounts/i });
+      const badge = myAccountsTab.querySelector('.ml-2');
+      expect(badge).toHaveTextContent('1');
     });
   });
 
@@ -264,9 +267,13 @@ describe('EmailSettingsSection', () => {
       const user = userEvent.setup();
       render(<EmailSettingsSection />);
 
-      const editButton = document.querySelector('.lucide-settings-2')?.parentElement;
-      if (editButton) {
-        await user.click(editButton);
+      // Find the edit button by its icon
+      const editButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.querySelector('.lucide-settings-2'));
+
+      if (editButtons.length > 0) {
+        await user.click(editButtons[0]!);
       }
 
       expect(mockOpenDialog).toHaveBeenCalledWith(mockAccounts[0]);
@@ -278,9 +285,13 @@ describe('EmailSettingsSection', () => {
       const user = userEvent.setup();
       render(<EmailSettingsSection />);
 
-      const deleteButton = document.querySelector('.lucide-trash-2')?.parentElement;
-      if (deleteButton) {
-        await user.click(deleteButton);
+      // Find the delete button by its icon
+      const deleteButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.querySelector('.lucide-trash-2'));
+
+      if (deleteButtons.length > 0) {
+        await user.click(deleteButtons[0]!);
       }
 
       await waitFor(() => {

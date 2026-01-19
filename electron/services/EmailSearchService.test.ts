@@ -66,9 +66,39 @@ describe('EmailSearchService', () => {
 
   describe('initialize', () => {
     it('should initialize search service successfully', async () => {
+      // Mock existing index data in database
+      const mockIndexData = JSON.stringify([
+        {
+          messageId: 'msg-1',
+          accountId: 'account-1',
+          subject: 'Test Subject',
+          bodyText: 'Test body',
+          sender: 'sender@example.com',
+          recipients: ['recipient@example.com'],
+          date: Date.now(),
+          folder: 'inbox',
+          attachmentNames: [],
+          indexedAt: Date.now(),
+        },
+      ]);
+
+      mockLevelDb.get.mockImplementation((key: string) => {
+        if (key === 'index:data') {
+          return Promise.resolve(mockIndexData);
+        }
+        return Promise.reject({ notFound: true });
+      });
+
       await searchService.initialize();
 
-      expect(mockMiniSearchInstance.addAll).toHaveBeenCalled();
+      expect(mockMiniSearchInstance.addAll).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            messageId: 'msg-1',
+            subject: 'Test Subject',
+          }),
+        ])
+      );
     });
 
     it('should create data directory on initialization', async () => {

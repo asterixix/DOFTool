@@ -222,7 +222,10 @@ describe('MessageComposer', () => {
 
       const removeButtons = document.querySelectorAll('.lucide-x');
       if (removeButtons.length > 0) {
-        await user.click(removeButtons[0].parentElement!);
+        const button = removeButtons[0];
+        if (button?.parentElement) {
+          await user.click(button.parentElement);
+        }
       }
 
       await waitFor(() => {

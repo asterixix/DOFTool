@@ -175,7 +175,7 @@ describe('useKeyboardShortcuts', () => {
       <MemoryRouter initialEntries={['/']}>{children}</MemoryRouter>
     );
 
-    const { result } = renderHook(() => useKeyboardShortcuts(defaultOptions), {
+    renderHook(() => useKeyboardShortcuts(defaultOptions), {
       wrapper: routerWrapper,
     });
 
@@ -187,7 +187,7 @@ describe('useKeyboardShortcuts', () => {
       { key: 's', path: '/settings' },
     ];
 
-    shortcuts.forEach(({ key, path }) => {
+    shortcuts.forEach(({ key }) => {
       const event = new KeyboardEvent('keydown', { key, cancelable: true });
       act(() => {
         window.dispatchEvent(event);

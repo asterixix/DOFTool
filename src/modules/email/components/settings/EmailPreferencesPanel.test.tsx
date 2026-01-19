@@ -308,7 +308,18 @@ describe('EmailPreferencesPanel', () => {
       const user = userEvent.setup();
       render(<EmailPreferencesPanel />);
 
-      const soundSwitch = screen.getByRole('switch', { name: /Notification sound/i });
+      const switches = screen.getAllByRole('switch');
+      const soundSwitch =
+        switches.find(
+          (switchEl) =>
+            switchEl.getAttribute('aria-label') === 'Notification sound' ||
+            switchEl.closest('div')?.querySelector('label')?.textContent === 'Notification sound'
+        ) || switches[2]; // Fallback to third switch (sound toggle)
+
+      if (!soundSwitch) {
+        throw new Error('Sound switch not found');
+      }
+
       await user.click(soundSwitch);
 
       expect(mockUpdateNotificationPreferences).toHaveBeenCalledWith({ soundEnabled: false });

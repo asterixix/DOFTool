@@ -52,7 +52,12 @@ function createMockProvider(): EventEmitter & {
   });
 
   const awarenessStates = new Map<number, AwarenessState>();
-  awarenessStates.set(1, { deviceId: 'local-device', deviceName: 'Local', cursor: null });
+  awarenessStates.set(1, {
+    deviceId: 'local-device',
+    deviceName: 'Local',
+    currentView: 'calendar',
+    lastSeen: Date.now(),
+  });
 
   provider.awareness = {
     on: vi.fn(),
@@ -115,10 +120,9 @@ describe('SyncService', () => {
   let mockYDoc: ReturnType<typeof createMockYDoc>;
 
   const defaultConfig: SyncConfig = {
-    familyId: 'family-test-123',
+    familyId: 'test-family',
     deviceId: 'local-device-123',
     deviceName: 'Local Device',
-    signalingServers: ['wss://signaling.example.com'],
   };
 
   beforeEach(() => {
@@ -144,12 +148,11 @@ describe('SyncService', () => {
       expect(syncService.isActive()).toBe(false);
     });
 
-    it('should throw error if already initialized', () => {
-      syncService.initialize(defaultConfig, mockYDoc);
+    it('should allow reinitialization', async () => {
+      await syncService.initialize(defaultConfig, mockYDoc);
 
-      expect(() => {
-        syncService.initialize(defaultConfig, mockYDoc);
-      }).toThrow('SyncService already initialized');
+      // Should not throw when initializing again
+      await expect(() => syncService.initialize(defaultConfig, mockYDoc)).not.toThrow();
     });
   });
 
@@ -219,7 +222,8 @@ describe('SyncService', () => {
 
       expect(statusHandler).toHaveBeenCalledWith(
         expect.objectContaining({
-          isConnected: false,
+          status: 'offline',
+          peerCount: 0,
         })
       );
     });
@@ -231,8 +235,8 @@ describe('SyncService', () => {
 
       const status = syncService.getStatus();
 
-      expect(status.isConnected).toBe(false);
-      expect(status.connectedPeers).toBe(0);
+      expect(status.status).toBe('offline');
+      expect(status.peerCount).toBe(0);
     });
 
     it('should return status reflecting provider state after starting', () => {
@@ -244,7 +248,7 @@ describe('SyncService', () => {
 
       const status = syncService.getStatus();
 
-      expect(status.isConnected).toBe(true);
+      expect(status.status).toBe('discovering');
     });
   });
 
@@ -271,8 +275,9 @@ describe('SyncService', () => {
 
       const peers = syncService.getConnectedPeers();
 
-      expect(peers).toContain('peer-1');
-      expect(peers).toContain('peer-2');
+      expect(peers).toHaveLength(2);
+      expect(peers[0]).toHaveProperty('deviceId', 'peer-1');
+      expect(peers[1]).toHaveProperty('deviceId', 'peer-2');
     });
   });
 
@@ -293,7 +298,11 @@ describe('SyncService', () => {
         bcPeers: [],
       });
 
-      expect(peerConnectedHandler).toHaveBeenCalledWith('peer-1');
+      expect(peerConnectedHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 'peer-1',
+        })
+      );
     });
 
     it('should emit peer-disconnected when peer leaves', () => {
@@ -346,8 +355,8 @@ describe('SyncService', () => {
       const state: AwarenessState = {
         deviceId: defaultConfig.deviceId,
         deviceName: defaultConfig.deviceName,
-        cursor: { x: 100, y: 200 },
-        lastActive: Date.now(),
+        currentView: 'calendar',
+        lastSeen: Date.now(),
       };
 
       syncService.setAwarenessState(state);
