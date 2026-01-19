@@ -123,8 +123,8 @@ export class ReminderSchedulingService {
       const triggerAt = event.start - minutes * 60_000;
       const delay = triggerAt - now;
 
-      // Skip past reminders
-      if (delay <= 0) {
+      // Skip past reminders (but allow immediate reminders)
+      if (delay < 0) {
         continue;
       }
 

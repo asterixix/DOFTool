@@ -10,13 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { ErrorBanner } from '@/shared/components';
 
-import {
-  FamilySetupCard,
-  InvitationCard,
-  JoinFamilyCard,
-  DevicesCard,
-  PermissionsCard,
-} from './components';
+import { FamilySetupCard, FamilyDiscoveryCard, DevicesCard, PermissionsCard } from './components';
 import { useFamily } from './hooks/useFamily';
 
 function FamilyOverview(): JSX.Element {
@@ -26,20 +20,14 @@ function FamilyOverview(): JSX.Element {
     permissions,
     isLoading,
     isCreating,
-    isInviting,
-    isJoining,
     error,
-    pendingInvite,
     hasFamily,
     isAdmin,
     currentDevice,
     loadFamily,
     createFamily,
-    generateInvite,
-    joinFamily,
     removeDevice,
     setPermission,
-    clearInvite,
     clearError,
   } = useFamily();
 
@@ -85,7 +73,7 @@ function FamilyOverview(): JSX.Element {
           <FamilySetupCard family={family} isCreating={isCreating} onCreateFamily={createFamily} />
         </motion.div>
 
-        {/* Join family (only show if no family) */}
+        {/* Join family via network discovery (only show if no family) */}
         {!hasFamily && (
           <motion.div
             animate="animate"
@@ -93,25 +81,7 @@ function FamilyOverview(): JSX.Element {
             transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.1 }}
             variants={cardVariants}
           >
-            <JoinFamilyCard hasFamily={hasFamily} isJoining={isJoining} onJoinFamily={joinFamily} />
-          </motion.div>
-        )}
-
-        {/* Invitations (only show if has family) */}
-        {hasFamily && (
-          <motion.div
-            animate="animate"
-            initial="initial"
-            transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.1 }}
-            variants={cardVariants}
-          >
-            <InvitationCard
-              hasFamily={hasFamily}
-              isInviting={isInviting}
-              pendingInvite={pendingInvite}
-              onClearInvite={clearInvite}
-              onGenerateInvite={generateInvite}
-            />
+            <FamilyDiscoveryCard hasFamily={hasFamily} />
           </motion.div>
         )}
       </div>

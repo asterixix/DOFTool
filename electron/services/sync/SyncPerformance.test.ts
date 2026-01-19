@@ -283,7 +283,7 @@ describe('SyncPerformance', () => {
 
       expect(fn).not.toHaveBeenCalled();
 
-      await vi.advanceTimersToNextTimerAsync();
+      await vi.runAllTimersAsync();
       await promise;
 
       expect(fn).toHaveBeenCalledTimes(1);
@@ -295,9 +295,18 @@ describe('SyncPerformance', () => {
       });
 
       const promise = deferToNextTick(fn);
-      await vi.advanceTimersToNextTimerAsync();
+      await vi.runAllTimersAsync();
 
-      await expect(promise).rejects.toThrow('Test error');
+      // Use a try-catch to handle the rejected promise
+      let caughtError: Error | null = null;
+      try {
+        await promise;
+      } catch (error) {
+        caughtError = error as Error;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect(caughtError?.message).toBe('Test error');
     });
   });
 

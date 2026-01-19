@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2, Radio, Users, Wifi, WifiOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -16,9 +17,18 @@ import { useSettingsStore } from '@/stores/settings.store';
 
 type CompletionAction = 'create' | 'join' | 'skip' | 'next';
 
+interface DiscoveredFamily {
+  id: string;
+  name: string;
+  adminDeviceName: string;
+  host: string;
+  port: number;
+  discoveredAt: number;
+}
+
 export default function WelcomePage(): JSX.Element {
   const navigate = useNavigate();
-  const { createFamily, joinFamily, isCreating, isJoining, error, clearError } = useFamily();
+  const { createFamily, joinFamily, isCreating, error, clearError } = useFamily();
   const {
     setFirstRunComplete,
     setOnboardingComplete,
@@ -28,24 +38,43 @@ export default function WelcomePage(): JSX.Element {
   } = useSettingsStore();
   const shouldReduceMotion = useReducedMotion();
 
-  const completeSetup = (action: CompletionAction): void => {
-    if (displayName.trim()) {
-      updateUserSettings({ displayName: displayName.trim() });
-    }
-    setFirstRunComplete();
-    setOnboardingComplete();
-
-    // Start tutorial for first-time users who haven't seen it
-    if (!tutorial.hasSeenTutorial && action !== 'skip') {
-      startTutorial();
-    }
-    navigate('/');
-  };
-
   const [activeStep, setActiveStep] = useState<'welcome' | 'setup'>('welcome');
   const [familyName, setFamilyName] = useState('');
-  const [inviteToken, setInviteToken] = useState('');
   const [displayName, setDisplayName] = useState('');
+
+  const completeSetup = useCallback(
+    (action: CompletionAction): void => {
+      if (displayName.trim()) {
+        updateUserSettings({ displayName: displayName.trim() });
+      }
+      setFirstRunComplete();
+      setOnboardingComplete();
+
+      // Start tutorial for first-time users who haven't seen it
+      if (!tutorial.hasSeenTutorial && action !== 'skip') {
+        startTutorial();
+      }
+      navigate('/');
+    },
+    [
+      displayName,
+      updateUserSettings,
+      setFirstRunComplete,
+      setOnboardingComplete,
+      tutorial.hasSeenTutorial,
+      startTutorial,
+      navigate,
+    ]
+  );
+
+  // Discovery state
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveredFamilies, setDiscoveredFamilies] = useState<DiscoveredFamily[]>([]);
+  const [selectedFamily, setSelectedFamily] = useState<DiscoveredFamily | null>(null);
+  const [joinRequestPending, setJoinRequestPending] = useState(false);
+  const [joinRequestStatus, setJoinRequestStatus] = useState<
+    'idle' | 'pending' | 'approved' | 'rejected'
+  >('idle');
 
   const handleCreateFamily = async (): Promise<void> => {
     if (!familyName.trim()) {
@@ -55,21 +84,6 @@ export default function WelcomePage(): JSX.Element {
     try {
       await createFamily(familyName.trim());
       completeSetup('create');
-    } catch {
-      // Error is handled by the useFamily hook
-    }
-  };
-
-  const handleJoinFamily = async (): Promise<void> => {
-    if (!inviteToken.trim()) {
-      return;
-    }
-
-    try {
-      const success = await joinFamily(inviteToken.trim());
-      if (success) {
-        completeSetup('join');
-      }
     } catch {
       // Error is handled by the useFamily hook
     }
@@ -92,6 +106,93 @@ export default function WelcomePage(): JSX.Element {
       setActiveStep('welcome');
     }
   };
+
+  // Start discovering families on the local network
+  const startDiscovery = useCallback(async (): Promise<void> => {
+    try {
+      setIsDiscovering(true);
+      await window.electronAPI.discovery.startDiscovering();
+
+      // Poll for discovered families
+      const pollFamilies = async (): Promise<void> => {
+        const families = await window.electronAPI.discovery.getDiscoveredFamilies();
+        setDiscoveredFamilies(families);
+      };
+
+      // Initial poll
+      await pollFamilies();
+
+      // Set up polling interval
+      const intervalId = setInterval(() => void pollFamilies(), 2000);
+
+      // Clean up after 30 seconds
+      setTimeout(() => {
+        clearInterval(intervalId);
+        void window.electronAPI.discovery.stopDiscovering();
+        setIsDiscovering(false);
+      }, 30000);
+    } catch (err) {
+      console.error('Failed to start discovery:', err);
+      setIsDiscovering(false);
+    }
+  }, []);
+
+  const stopDiscovery = useCallback(async (): Promise<void> => {
+    try {
+      await window.electronAPI.discovery.stopDiscovering();
+      setIsDiscovering(false);
+    } catch (err) {
+      console.error('Failed to stop discovery:', err);
+    }
+  }, []);
+
+  const handleRequestJoin = async (family: DiscoveredFamily): Promise<void> => {
+    try {
+      setSelectedFamily(family);
+      setJoinRequestPending(true);
+      setJoinRequestStatus('pending');
+
+      await window.electronAPI.discovery.requestJoin(family.id);
+
+      // The request is now pending - we'll wait for approval via events
+    } catch (err) {
+      console.error('Failed to request join:', err);
+      setJoinRequestStatus('idle');
+      setJoinRequestPending(false);
+    }
+  };
+
+  // Listen for join request approval/rejection
+  useEffect(() => {
+    const unsubscribeApproved = window.electronAPI.discovery.onJoinRequestApproved((approval) => {
+      void (async () => {
+        if (approval.approved && approval.syncToken) {
+          setJoinRequestStatus('approved');
+
+          // Use the sync token to join the family
+          try {
+            const result = await joinFamily(approval.syncToken);
+            if (result) {
+              completeSetup('join');
+            }
+          } catch (err) {
+            console.error('Failed to join family after approval:', err);
+          }
+        }
+        setJoinRequestPending(false);
+      })();
+    });
+
+    const unsubscribeRejected = window.electronAPI.discovery.onJoinRequestRejected(() => {
+      setJoinRequestStatus('rejected');
+      setJoinRequestPending(false);
+    });
+
+    return () => {
+      unsubscribeApproved();
+      unsubscribeRejected();
+    };
+  }, [joinFamily, completeSetup]);
 
   const pageVariants = {
     initial: shouldReduceMotion ? {} : { opacity: 0, y: 20 },
@@ -272,28 +373,100 @@ export default function WelcomePage(): JSX.Element {
                   <div>
                     <h3 className="font-medium">Join Existing Family</h3>
                     <p className="mb-3 text-sm text-muted-foreground">
-                      Enter an invite token from a family member
+                      Discover families on your local network or enter an invite token
                     </p>
-                    <div className="space-y-2">
-                      <Label htmlFor="inviteToken">Invite Token</Label>
-                      <Input
-                        id="inviteToken"
-                        placeholder="Enter invite token"
-                        value={inviteToken}
-                        onChange={(e) => {
-                          setInviteToken(e.target.value);
-                          clearError();
-                        }}
-                      />
+
+                    {/* Network Discovery Section */}
+                    <div className="mb-4 rounded-lg border p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {isDiscovering ? (
+                            <Wifi className="h-4 w-4 animate-pulse text-primary" />
+                          ) : (
+                            <WifiOff className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="text-sm font-medium">Network Discovery</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={isDiscovering ? 'outline' : 'default'}
+                          onClick={() => void (isDiscovering ? stopDiscovery() : startDiscovery())}
+                        >
+                          {isDiscovering ? (
+                            <>
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              Stop
+                            </>
+                          ) : (
+                            <>
+                              <Radio className="mr-1 h-3 w-3" />
+                              Scan
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {discoveredFamilies.length > 0 ? (
+                        <div className="max-h-32 space-y-2 overflow-y-auto">
+                          {discoveredFamilies.map((family) => (
+                            <div
+                              key={family.id}
+                              className={`flex items-center justify-between rounded-md border p-2 transition-colors ${
+                                selectedFamily?.id === family.id
+                                  ? 'border-primary bg-primary/5'
+                                  : 'hover:bg-muted/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-muted-foreground" />
+                                <div>
+                                  <p className="text-sm font-medium">{family.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Host: {family.adminDeviceName}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                disabled={joinRequestPending}
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleRequestJoin(family)}
+                              >
+                                {joinRequestPending && selectedFamily?.id === family.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  'Request Join'
+                                )}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : isDiscovering ? (
+                        <p className="py-2 text-center text-xs text-muted-foreground">
+                          Scanning for families on your network...
+                        </p>
+                      ) : (
+                        <p className="py-2 text-center text-xs text-muted-foreground">
+                          Click Scan to find families on your local network
+                        </p>
+                      )}
+
+                      {joinRequestStatus === 'pending' && (
+                        <div className="mt-2 rounded-md bg-yellow-500/10 p-2 text-center">
+                          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                            Waiting for admin approval from {selectedFamily?.name}...
+                          </p>
+                        </div>
+                      )}
+
+                      {joinRequestStatus === 'rejected' && (
+                        <div className="mt-2 rounded-md bg-red-500/10 p-2 text-center">
+                          <p className="text-xs text-red-600 dark:text-red-400">
+                            Join request was rejected. Please try again.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      className="mt-3 w-full"
-                      disabled={!inviteToken.trim() || isJoining}
-                      variant="outline"
-                      onClick={() => void handleJoinFamily()}
-                    >
-                      {isJoining ? 'Joining...' : 'Join Family'}
-                    </Button>
                   </div>
                 </div>
 

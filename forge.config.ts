@@ -8,7 +8,10 @@ import { PublisherGithub } from '@electron-forge/publisher-github';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
-import path from 'path';
+import * as path from 'path';
+
+// Note: For Linux AppImage support, install: npm install --save-dev @reforged/maker-appimage
+// Then uncomment the AppImage maker below
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -17,7 +20,13 @@ const config: ForgeConfig = {
     appBundleId: 'app.doftool.desktop',
     appCopyright: 'Copyright © 2024 Artur Sendyka',
     appCategoryType: 'public.app-category.productivity',
-    asar: true,
+    // ASAR archive for faster loading and hiding source code
+    asar: {
+      // Unpack native modules that can't run from ASAR
+      unpack: '*.{node,dll,so,dylib}',
+      // Unpack patterns for modules that need filesystem access
+      unpackDir: '{node_modules/level,node_modules/y-leveldb,node_modules/libsodium-wrappers}',
+    },
     icon: path.resolve(__dirname, 'public/icon'),
     // Disable code signing - no certificates available
     osxSign: undefined,
@@ -36,57 +45,135 @@ const config: ForgeConfig = {
         'DOFTool uses local network to sync data between family devices.',
       NSBonjourServices: ['_doftool._tcp'],
     },
-    // Ignore patterns for packaging
+    // Comprehensive ignore patterns for optimized packaging
+    // Only include dist/ and necessary node_modules
     ignore: [
+      // Source and development directories
       /^\/src\//,
       /^\/tests\//,
       /^\/scripts\//,
       /^\/docs\//,
-      /^\/.github\//,
+      /^\/electron\/.*\.ts$/, // Exclude TypeScript source, keep compiled JS
+      /^\/\.github\//,
       /^\/\.vscode\//,
-      /^\/node_modules\/\.cache/,
+      /^\/\.cursor\//,
+      /^\/\.husky\//,
+      /^\/\.git\//,
+      /^\/build\//,
+      /^\/playwright-report\//,
+      /^\/coverage\//,
+
+      // Config files not needed at runtime
+      /^\/(tsconfig|vite\.config|vitest\.config|playwright\.config|postcss\.config|tailwind\.config|forge\.config|commitlint\.config|components\.json)/,
+      /^\/\.eslint/,
+      /^\/\.prettier/,
+      /^\/\.gitignore$/,
+
+      // Documentation and metadata
       /\.md$/,
+      /\.txt$/,
+      /LICENSE$/,
+      /CHANGELOG$/,
+      /CONTRIBUTING$/,
+      /CODE_OF_CONDUCT$/,
+      /SECURITY$/,
+
+      // Source maps and TypeScript artifacts
       /\.map$/,
-      /tsconfig.*\.json$/,
-      /vite\.config\.(ts|js)$/,
-      /vitest\.config\.(ts|js)$/,
-      /playwright\.config\.(ts|js)$/,
-      /eslint/,
-      /prettier/,
-      /\.husky/,
+      /\.d\.ts$/,
+      /\.tsbuildinfo$/,
+
+      // Test files
+      /\.test\.(ts|tsx|js|jsx)$/,
+      /\.spec\.(ts|tsx|js|jsx)$/,
+      /__tests__/,
+      /__mocks__/,
+
+      // Development dependencies in node_modules
+      /node_modules\/\.cache/,
+      /node_modules\/@types\//,
+      /node_modules\/typescript\//,
+      /node_modules\/eslint/,
+      /node_modules\/prettier/,
+      /node_modules\/vitest/,
+      /node_modules\/@vitest\//,
+      /node_modules\/@playwright\//,
+      /node_modules\/@testing-library\//,
+      /node_modules\/jsdom/,
+      /node_modules\/husky/,
+      /node_modules\/lint-staged/,
+      /node_modules\/@commitlint\//,
+      /node_modules\/@electron-forge\//,
+      /node_modules\/@electron\/fuses\//,
+      /node_modules\/electron$/,
+      /node_modules\/vite/,
+      /node_modules\/@vitejs\//,
+      /node_modules\/tailwindcss$/,
+      /node_modules\/autoprefixer/,
+      /node_modules\/postcss$/,
+
+      // Unnecessary files in node_modules
+      /node_modules\/.*\/README/i,
+      /node_modules\/.*\/CHANGELOG/i,
+      /node_modules\/.*\/LICENSE/i,
+      /node_modules\/.*\/\.github\//,
+      /node_modules\/.*\/docs?\//,
+      /node_modules\/.*\/test\//,
+      /node_modules\/.*\/tests\//,
+      /node_modules\/.*\/examples?\//,
+      /node_modules\/.*\/\.eslint/,
+      /node_modules\/.*\/\.prettier/,
     ],
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    force: false,
+    onlyModules: [],
+  },
   makers: [
-    // Windows - Squirrel.Windows (NSIS-style installer)
+    // ============================================
+    // WINDOWS MAKERS
+    // ============================================
+
+    // Windows - Squirrel.Windows (exe installer with auto-update support)
     new MakerSquirrel({
       name: 'DOFTool',
-      // Icon for the generated Setup.exe
+      // App metadata
+      title: 'DOFTool - Family Collaboration',
+      authors: 'Artur Sendyka',
+      description:
+        'Decentralized, offline-first, end-to-end encrypted family collaboration for Calendar, Tasks, and Email with P2P synchronization.',
+      // Icons
       setupIcon: path.resolve(__dirname, 'public/icon.ico'),
-      // Icon URL for Control Panel
       iconUrl: 'https://raw.githubusercontent.com/asterixix/DOFTool/main/public/icon.ico',
-      // No code signing
-      // certificateFile: undefined,
-      // certificatePassword: undefined,
+      // Custom loading animation during installation
+      loadingGif: path.resolve(__dirname, 'public/installer-loading.gif'),
+      // Installer options
+      noMsi: false, // Also generate MSI installer
+      setupExe: 'DOFTool-Setup.exe',
+      // Code signing (uncomment when certificate is available)
+      // certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
+      // certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,
     }),
-    // macOS - ZIP for auto-updates
-    new MakerZIP(
-      {
-        // macOS auto-update manifest URL (for GitHub releases)
-        // This will be used by electron-updater
-      },
-      ['darwin']
-    ),
-    // macOS - DMG for distribution
+
+    // Windows - ZIP (portable version, no installation required)
+    new MakerZIP({}, ['win32']),
+
+    // ============================================
+    // MACOS MAKERS
+    // ============================================
+
+    // macOS - DMG (disk image for distribution)
     new MakerDMG({
       icon: path.resolve(__dirname, 'public/icon.icns'),
-      format: 'ULFO',
+      format: 'ULFO', // ULFO = lzfse compression (best for modern macOS)
+      name: 'DOFTool',
+      overwrite: true,
       contents: [
         {
           x: 130,
           y: 220,
           type: 'file',
-          path: '',
+          path: '', // Will be filled by Forge with the app path
         },
         {
           x: 410,
@@ -104,7 +191,21 @@ const config: ForgeConfig = {
         },
       },
     }),
-    // Linux - Debian package
+
+    // macOS - ZIP (for auto-updates via electron-updater)
+    new MakerZIP(
+      {
+        // macUpdateManifestBaseUrl is used for Squirrel.Mac auto-updates
+        // electron-updater uses GitHub releases directly, so this is optional
+      },
+      ['darwin']
+    ),
+
+    // ============================================
+    // LINUX MAKERS
+    // ============================================
+
+    // Linux - Debian/Ubuntu package (.deb)
     new MakerDeb({
       options: {
         name: 'doftool',
@@ -115,14 +216,16 @@ const config: ForgeConfig = {
         maintainer: 'Artur Sendyka <artur@sendyka.dev>',
         homepage: 'https://sendyka.dev',
         icon: path.resolve(__dirname, 'public/icon.png'),
-        categories: ['Office', 'Calendar', 'ProjectManagement', 'Email'],
+        categories: ['Office', 'Utility', 'System'],
         section: 'utils',
         priority: 'optional',
-        depends: ['libnotify4', 'libsecret-1-0'],
+        // Runtime dependencies
+        depends: ['libnotify4', 'libsecret-1-0', 'libgtk-3-0', 'libnss3'],
         mimeType: ['x-scheme-handler/doftool'],
       },
     }),
-    // Linux - RPM package
+
+    // Linux - RPM package (Fedora/RHEL/CentOS)
     new MakerRpm({
       options: {
         name: 'doftool',
@@ -133,10 +236,24 @@ const config: ForgeConfig = {
         license: 'MIT',
         homepage: 'https://sendyka.dev',
         icon: path.resolve(__dirname, 'public/icon.png'),
-        categories: ['Office', 'Calendar', 'ProjectManagement', 'Email'],
-        requires: ['libnotify', 'libsecret'],
+        categories: ['Office', 'Utility', 'System'],
+        // Runtime dependencies
+        requires: ['libnotify', 'libsecret', 'gtk3', 'nss'],
       },
     }),
+
+    // Linux - ZIP (portable, for AppImage alternative or manual installation)
+    new MakerZIP({}, ['linux']),
+
+    // Linux - AppImage (universal Linux package)
+    // Uncomment after installing: npm install --save-dev @reforged/maker-appimage
+    // new MakerAppImage({
+    //   options: {
+    //     name: 'DOFTool',
+    //     icon: path.resolve(__dirname, 'public/icon.png'),
+    //     categories: ['Office', 'Calendar', 'ProjectManagement', 'Email'],
+    //   },
+    // }),
   ],
   publishers: [
     new PublisherGithub({
@@ -169,7 +286,7 @@ const config: ForgeConfig = {
       // Build is handled by npm scripts before forge:make
       console.log('[Forge] Assets generated');
     },
-    postMake: async (_config, makeResults) => {
+    postMake: async (_config: ForgeConfig, makeResults: any[]) => {
       console.log('[Forge] Make completed');
       for (const result of makeResults) {
         console.log(`[Forge] Platform: ${result.platform}, Arch: ${result.arch}`);

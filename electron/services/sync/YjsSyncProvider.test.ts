@@ -4,7 +4,6 @@ import * as Y from 'yjs';
 import { YjsSyncProvider } from './YjsSyncProvider';
 
 import type { DataChannelLike, SyncMessage, AwarenessState } from './Sync.types';
-import type { Awareness } from 'y-protocols/awareness';
 
 // Mock yjs
 const mockYDoc = {
@@ -68,7 +67,7 @@ describe('YjsSyncProvider', () => {
     mockYDocInstance = mockYDoc as unknown as Y.Doc;
 
     mockDataChannel = {
-      readyState: 'open' as RTCDataChannelState,
+      readyState: 'open' as 'open',
       send: vi.fn(),
       close: vi.fn(),
       onopen: null,

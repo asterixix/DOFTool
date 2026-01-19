@@ -343,6 +343,7 @@ export class SyncService extends EventEmitter {
 
     this.isRunning = false;
     this.provider?.disconnect();
+    this.provider?.destroy();
     this.updateStatus('offline');
 
     console.log('[SyncService] Stopped');

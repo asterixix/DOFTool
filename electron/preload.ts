@@ -315,6 +315,8 @@ const electronAPI = {
   getPlatform: (): Promise<NodeJS.Platform> => ipcRenderer.invoke('app:platform'),
   openExternal: (url: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('app:openExternal', url),
+  resetAllData: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:resetAllData'),
 
   // Analytics - routes to main process Aptabase SDK
   analytics: {
@@ -440,6 +442,150 @@ const electronAPI = {
       role: string
     ): Promise<{ memberId: string; role: string; createdAt: number }> =>
       ipcRenderer.invoke('family:setPermission', memberId, role),
+  },
+
+  // Family Discovery operations (mDNS-based local network discovery)
+  discovery: {
+    startDiscovering: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('discovery:startDiscovering'),
+    stopDiscovering: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('discovery:stopDiscovering'),
+    getDiscoveredFamilies: (): Promise<
+      Array<{
+        id: string;
+        name: string;
+        adminDeviceName: string;
+        host: string;
+        port: number;
+        discoveredAt: number;
+      }>
+    > => ipcRenderer.invoke('discovery:getDiscoveredFamilies'),
+    requestJoin: (
+      familyId: string
+    ): Promise<{
+      id: string;
+      deviceId: string;
+      deviceName: string;
+      requestedAt: number;
+      status: 'pending' | 'approved' | 'rejected';
+    }> => ipcRenderer.invoke('discovery:requestJoin', familyId),
+    getPendingJoinRequests: (): Promise<
+      Array<{
+        id: string;
+        deviceId: string;
+        deviceName: string;
+        requestedAt: number;
+        status: 'pending' | 'approved' | 'rejected';
+      }>
+    > => ipcRenderer.invoke('discovery:getPendingJoinRequests'),
+    approveJoinRequest: (
+      requestId: string,
+      role: 'admin' | 'member' | 'viewer'
+    ): Promise<{
+      requestId: string;
+      approved: boolean;
+      role?: 'admin' | 'member' | 'viewer';
+      familyId?: string;
+      familyName?: string;
+      syncToken?: string;
+    } | null> => ipcRenderer.invoke('discovery:approveJoinRequest', requestId, role),
+    rejectJoinRequest: (requestId: string): Promise<boolean> =>
+      ipcRenderer.invoke('discovery:rejectJoinRequest', requestId),
+    startPublishing: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('discovery:startPublishing'),
+    stopPublishing: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('discovery:stopPublishing'),
+    receiveJoinRequest: (
+      deviceId: string,
+      deviceName: string
+    ): Promise<{
+      id: string;
+      deviceId: string;
+      deviceName: string;
+      requestedAt: number;
+      status: 'pending' | 'approved' | 'rejected';
+    }> => ipcRenderer.invoke('discovery:receiveJoinRequest', deviceId, deviceName),
+    // Event listeners for discovery notifications
+    onFamilyDiscovered: (
+      callback: (family: {
+        id: string;
+        name: string;
+        adminDeviceName: string;
+        host: string;
+        port: number;
+        discoveredAt: number;
+      }) => void
+    ): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, family: unknown): void => {
+        callback(
+          family as {
+            id: string;
+            name: string;
+            adminDeviceName: string;
+            host: string;
+            port: number;
+            discoveredAt: number;
+          }
+        );
+      };
+      ipcRenderer.on('discovery:familyDiscovered', handler);
+      return () => ipcRenderer.removeListener('discovery:familyDiscovered', handler);
+    },
+    onNewJoinRequest: (
+      callback: (request: {
+        id: string;
+        deviceId: string;
+        deviceName: string;
+        requestedAt: number;
+        status: 'pending' | 'approved' | 'rejected';
+      }) => void
+    ): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: unknown): void => {
+        callback(
+          request as {
+            id: string;
+            deviceId: string;
+            deviceName: string;
+            requestedAt: number;
+            status: 'pending' | 'approved' | 'rejected';
+          }
+        );
+      };
+      ipcRenderer.on('discovery:newJoinRequest', handler);
+      return () => ipcRenderer.removeListener('discovery:newJoinRequest', handler);
+    },
+    onJoinRequestApproved: (
+      callback: (approval: {
+        requestId: string;
+        approved: boolean;
+        role?: 'admin' | 'member' | 'viewer';
+        familyId?: string;
+        familyName?: string;
+        syncToken?: string;
+      }) => void
+    ): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, approval: unknown): void => {
+        callback(
+          approval as {
+            requestId: string;
+            approved: boolean;
+            role?: 'admin' | 'member' | 'viewer';
+            familyId?: string;
+            familyName?: string;
+            syncToken?: string;
+          }
+        );
+      };
+      ipcRenderer.on('discovery:joinRequestApproved', handler);
+      return () => ipcRenderer.removeListener('discovery:joinRequestApproved', handler);
+    },
+    onJoinRequestRejected: (callback: (requestId: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, requestId: unknown): void => {
+        callback(requestId as string);
+      };
+      ipcRenderer.on('discovery:joinRequestRejected', handler);
+      return () => ipcRenderer.removeListener('discovery:joinRequestRejected', handler);
+    },
   },
 
   // Calendar operations

@@ -458,11 +458,40 @@ interface UpdateInfo {
   downloadUrl?: string;
 }
 
+// Family Discovery types
+interface DiscoveredFamily {
+  id: string;
+  name: string;
+  adminDeviceName: string;
+  host: string;
+  port: number;
+  discoveredAt: number;
+}
+
+interface JoinRequest {
+  id: string;
+  deviceId: string;
+  deviceName: string;
+  requestedAt: number;
+  status: 'pending' | 'approved' | 'rejected';
+  assignedRole?: 'admin' | 'member' | 'viewer';
+}
+
+interface JoinApproval {
+  requestId: string;
+  approved: boolean;
+  role?: 'admin' | 'member' | 'viewer';
+  familyId?: string;
+  familyName?: string;
+  syncToken?: string;
+}
+
 interface ElectronAPI {
   // App info
   getVersion: () => Promise<string>;
   getPlatform: () => Promise<NodeJS.Platform>;
   openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+  resetAllData: () => Promise<{ success: boolean; error?: string }>;
 
   // Analytics - routes to main process Aptabase SDK
   analytics: {
@@ -565,6 +594,27 @@ interface ElectronAPI {
       memberId: string,
       role: string
     ) => Promise<{ memberId: string; role: string; createdAt: number }>;
+  };
+
+  // Family Discovery operations (mDNS-based local network discovery)
+  discovery: {
+    startDiscovering: () => Promise<{ success: boolean }>;
+    stopDiscovering: () => Promise<{ success: boolean }>;
+    getDiscoveredFamilies: () => Promise<DiscoveredFamily[]>;
+    requestJoin: (familyId: string) => Promise<JoinRequest>;
+    getPendingJoinRequests: () => Promise<JoinRequest[]>;
+    approveJoinRequest: (
+      requestId: string,
+      role: 'admin' | 'member' | 'viewer'
+    ) => Promise<JoinApproval | null>;
+    rejectJoinRequest: (requestId: string) => Promise<boolean>;
+    startPublishing: () => Promise<{ success: boolean }>;
+    stopPublishing: () => Promise<{ success: boolean }>;
+    receiveJoinRequest: (deviceId: string, deviceName: string) => Promise<JoinRequest>;
+    onFamilyDiscovered: (callback: (family: DiscoveredFamily) => void) => () => void;
+    onNewJoinRequest: (callback: (request: JoinRequest) => void) => () => void;
+    onJoinRequestApproved: (callback: (approval: JoinApproval) => void) => () => void;
+    onJoinRequestRejected: (callback: (requestId: string) => void) => () => void;
   };
 
   // Calendar operations

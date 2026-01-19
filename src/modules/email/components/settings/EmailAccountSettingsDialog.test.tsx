@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { EmailAccountSettingsDialog } from './EmailAccountSettingsDialog';
+import { useEmailSettings } from '../../hooks/useEmailSettings';
 
 import type { EmailAccountSettings } from '../../types/EmailSettings.types';
 
@@ -28,12 +29,19 @@ vi.mock('../../stores/emailSettings.store', () => ({
 
 vi.mock('../../hooks/useEmailSettings', () => ({
   useEmailSettings: vi.fn(() => ({
+    settings: null,
+    isLoading: false,
     createAccount: mockCreateAccount,
     updateAccount: mockUpdateAccount,
     testConnection: mockTestConnection,
     isSaving: false,
     isTestingConnection: false,
     testResult: null,
+    error: null,
+    loadSettings: vi.fn(),
+    saveSettings: vi.fn(),
+    deleteAccount: vi.fn(),
+    clearError: vi.fn(),
   })),
 }));
 
@@ -282,7 +290,7 @@ describe('EmailAccountSettingsDialog', () => {
       const displayNameInput = screen.getByLabelText('Display Name *');
       await user.type(displayNameInput, 'Test');
 
-      const incomingHostInput = screen.getByLabelText(/Host/);
+      const incomingHostInput = screen.getByLabelText('Host *', { selector: '#incomingHost' });
       await user.type(incomingHostInput, 'imap.test.com');
 
       const submitButton = screen.getByRole('button', { name: /Create Account/i });
@@ -302,7 +310,7 @@ describe('EmailAccountSettingsDialog', () => {
       const emailInput = screen.getByLabelText('Email Address *');
       await user.type(emailInput, 'test@example.com');
 
-      const incomingHostInput = screen.getByLabelText(/Host/);
+      const incomingHostInput = screen.getByLabelText('Host *', { selector: '#incomingHost' });
       await user.type(incomingHostInput, 'imap.test.com');
 
       await user.click(screen.getByRole('button', { name: /Test Connection/i }));
@@ -311,51 +319,80 @@ describe('EmailAccountSettingsDialog', () => {
     });
 
     it('should show Testing... while testing connection', () => {
-      vi.mocked(require('../../hooks/useEmailSettings').useEmailSettings).mockReturnValueOnce({
+      vi.mocked(useEmailSettings).mockReturnValue({
+        settings: null,
+        isLoading: false,
         createAccount: mockCreateAccount,
         updateAccount: mockUpdateAccount,
         testConnection: mockTestConnection,
         isSaving: false,
         isTestingConnection: true,
         testResult: null,
+        error: null,
+        loadSettings: vi.fn(),
+        saveSettings: vi.fn(),
+        deleteAccount: vi.fn(),
+        clearError: vi.fn(),
       });
 
       render(<EmailAccountSettingsDialog />);
 
-      expect(screen.getByText('Testing...')).toBeInTheDocument();
+      expect(screen.getByText('Testing...', { selector: 'button' })).toBeInTheDocument();
     });
 
     it('should show test results when available', () => {
-      vi.mocked(require('../../hooks/useEmailSettings').useEmailSettings).mockReturnValueOnce({
+      vi.mocked(useEmailSettings).mockReturnValue({
+        settings: null,
+        isLoading: false,
         createAccount: mockCreateAccount,
         updateAccount: mockUpdateAccount,
         testConnection: mockTestConnection,
         isSaving: false,
         isTestingConnection: false,
         testResult: {
+          success: true,
           incoming: { success: true, latency: 150 },
           outgoing: { success: true, latency: 200 },
         },
+        error: null,
+        loadSettings: vi.fn(),
+        saveSettings: vi.fn(),
+        deleteAccount: vi.fn(),
+        clearError: vi.fn(),
       });
 
       render(<EmailAccountSettingsDialog />);
 
-      expect(screen.getByText('Connection Test Results')).toBeInTheDocument();
+      expect(
+        screen.getByText((content, element) => {
+          return (
+            content.includes('Connection Test Results') && element?.tagName.toLowerCase() === 'h4'
+          );
+        })
+      ).toBeInTheDocument();
       expect(screen.getByText(/Success \(150ms\)/)).toBeInTheDocument();
       expect(screen.getByText(/Success \(200ms\)/)).toBeInTheDocument();
     });
 
     it('should show error in test results', () => {
-      vi.mocked(require('../../hooks/useEmailSettings').useEmailSettings).mockReturnValueOnce({
+      vi.mocked(useEmailSettings).mockReturnValue({
+        settings: null,
+        isLoading: false,
         createAccount: mockCreateAccount,
         updateAccount: mockUpdateAccount,
         testConnection: mockTestConnection,
         isSaving: false,
         isTestingConnection: false,
         testResult: {
+          success: false,
           incoming: { success: false, error: 'Connection refused' },
           outgoing: { success: true, latency: 200 },
         },
+        error: null,
+        loadSettings: vi.fn(),
+        saveSettings: vi.fn(),
+        deleteAccount: vi.fn(),
+        clearError: vi.fn(),
       });
 
       render(<EmailAccountSettingsDialog />);
@@ -376,10 +413,12 @@ describe('EmailAccountSettingsDialog', () => {
       await user.type(displayNameInput, 'Test User');
 
       // Fill required server fields
-      const incomingHostInput = screen.getByLabelText(/Host/);
+      const incomingHostInput = screen.getByLabelText('Host *', { selector: '#incomingHost' });
       await user.type(incomingHostInput, 'imap.test.com');
 
-      const incomingUsernameInput = screen.getByLabelText('Username *');
+      const incomingUsernameInput = screen.getByLabelText('Username *', {
+        selector: '#incomingUsername',
+      });
       await user.type(incomingUsernameInput, 'test@example.com');
 
       const incomingPasswordInputs = screen.getAllByLabelText(/^Password/);
@@ -393,18 +432,25 @@ describe('EmailAccountSettingsDialog', () => {
     });
 
     it('should show Saving... while saving', () => {
-      vi.mocked(require('../../hooks/useEmailSettings').useEmailSettings).mockReturnValueOnce({
+      vi.mocked(useEmailSettings).mockReturnValue({
+        settings: null,
+        isLoading: false,
         createAccount: mockCreateAccount,
         updateAccount: mockUpdateAccount,
         testConnection: mockTestConnection,
         isSaving: true,
         isTestingConnection: false,
         testResult: null,
+        error: null,
+        loadSettings: vi.fn(),
+        saveSettings: vi.fn(),
+        deleteAccount: vi.fn(),
+        clearError: vi.fn(),
       });
 
       render(<EmailAccountSettingsDialog />);
 
-      expect(screen.getByText('Saving...')).toBeInTheDocument();
+      expect(screen.getByText('Saving...', { selector: 'button' })).toBeInTheDocument();
     });
 
     it('should close dialog after successful save', async () => {
@@ -417,10 +463,12 @@ describe('EmailAccountSettingsDialog', () => {
       const displayNameInput = screen.getByLabelText('Display Name *');
       await user.type(displayNameInput, 'Test User');
 
-      const incomingHostInput = screen.getByLabelText(/Host/);
+      const incomingHostInput = screen.getByLabelText('Host *', { selector: '#incomingHost' });
       await user.type(incomingHostInput, 'imap.test.com');
 
-      const incomingUsernameInput = screen.getByLabelText('Username *');
+      const incomingUsernameInput = screen.getByLabelText('Username *', {
+        selector: '#incomingUsername',
+      });
       await user.type(incomingUsernameInput, 'test@example.com');
 
       const incomingPasswordInputs = screen.getAllByLabelText(/^Password/);
@@ -447,13 +495,20 @@ describe('EmailAccountSettingsDialog', () => {
 
   describe('disabled states', () => {
     it('should disable buttons while saving', () => {
-      vi.mocked(require('../../hooks/useEmailSettings').useEmailSettings).mockReturnValueOnce({
+      vi.mocked(useEmailSettings).mockReturnValue({
+        settings: null,
+        isLoading: false,
         createAccount: mockCreateAccount,
         updateAccount: mockUpdateAccount,
         testConnection: mockTestConnection,
         isSaving: true,
         isTestingConnection: false,
         testResult: null,
+        error: null,
+        loadSettings: vi.fn(),
+        saveSettings: vi.fn(),
+        deleteAccount: vi.fn(),
+        clearError: vi.fn(),
       });
 
       render(<EmailAccountSettingsDialog />);
@@ -463,18 +518,25 @@ describe('EmailAccountSettingsDialog', () => {
     });
 
     it('should disable buttons while testing connection', () => {
-      vi.mocked(require('../../hooks/useEmailSettings').useEmailSettings).mockReturnValueOnce({
+      vi.mocked(useEmailSettings).mockReturnValue({
+        settings: null,
+        isLoading: false,
         createAccount: mockCreateAccount,
         updateAccount: mockUpdateAccount,
         testConnection: mockTestConnection,
         isSaving: false,
         isTestingConnection: true,
         testResult: null,
+        error: null,
+        loadSettings: vi.fn(),
+        saveSettings: vi.fn(),
+        deleteAccount: vi.fn(),
+        clearError: vi.fn(),
       });
 
       render(<EmailAccountSettingsDialog />);
 
-      expect(screen.getByRole('button', { name: /Saving/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Create Account' })).toBeDisabled();
     });
   });
 });

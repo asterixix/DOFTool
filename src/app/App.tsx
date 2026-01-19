@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HashRouter } from 'react-router-dom';
 
 import { useCompactMode } from '@/hooks/useCompactMode';
+import { JoinRequestDialog } from '@/modules/family/components/JoinRequestDialog';
+import { useFamilyStore } from '@/modules/family/stores/family.store';
 import { BRAND } from '@/shared/brand';
 import { createErrorDetails, reportCrash } from '@/shared/services/crashReporting';
 import { logToDebug } from '@/shared/utils/debugLogger';
@@ -25,6 +27,9 @@ const queryClient = new QueryClient({
 export function App(): JSX.Element {
   // Apply compact mode styling
   useCompactMode();
+
+  // Get admin status for join request dialog
+  const isAdmin = useFamilyStore((state) => state.isAdmin);
 
   useEffect(() => {
     // Analytics is initialized in the main process (electron/main.ts)
@@ -111,6 +116,7 @@ export function App(): JSX.Element {
         <ThemeProvider defaultTheme="system" storageKey={BRAND.themeStorageKey}>
           <HashRouter>
             <Router />
+            <JoinRequestDialog isAdmin={isAdmin()} />
           </HashRouter>
         </ThemeProvider>
       </QueryClientProvider>

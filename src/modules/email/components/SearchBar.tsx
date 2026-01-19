@@ -163,14 +163,16 @@ export function SearchBar({
             <div>
               <Label>Folder</Label>
               <Select
-                value={query.folder ?? ''}
-                onValueChange={(value) => handleQueryChange('folder', value || undefined)}
+                value={query.folder ?? 'all'}
+                onValueChange={(value) =>
+                  handleQueryChange('folder', value === 'all' ? undefined : value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All folders" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All folders</SelectItem>
+                  <SelectItem value="all">All folders</SelectItem>
                   {folders.map((folder) => (
                     <SelectItem key={folder.path} value={folder.path}>
                       {folder.name}

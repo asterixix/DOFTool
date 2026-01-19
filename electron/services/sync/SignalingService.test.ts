@@ -26,7 +26,7 @@ function createMockSocket(): Socket &
 
   socket._handlers = handlers;
   socket.writable = true;
-  socket.write = vi.fn((data: string) => {
+  socket.write = vi.fn((_data: string) => {
     return true;
   });
   socket.destroy = vi.fn();
@@ -58,7 +58,12 @@ function createMockServer(): Server &
     };
 
   server._connectionHandler = null;
-  server.listen = vi.fn((_port: number, callback?: () => void) => {
+  server.listen = vi.fn((...args: any[]) => {
+    const callback =
+      typeof args[args.length - 1] === 'function'
+        ? (args[args.length - 1] as () => void)
+        : undefined;
+
     server.address = vi.fn(() => ({ port: 12345, family: 'IPv4', address: '127.0.0.1' }));
     if (callback) {
       setImmediate(callback);

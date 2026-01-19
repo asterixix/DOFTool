@@ -8,7 +8,7 @@ import addressparser, { type AddressOrGroup } from 'nodemailer/lib/addressparser
 
 import type { EncryptionService } from './EncryptionService';
 import type { StorageService } from './StorageService';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import type * as SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export interface ImapConfig {
   host: string;
@@ -1111,9 +1111,9 @@ export class EmailService {
     }
 
     // Close SMTP transports
-    for (const transport of this.smtpTransports.values()) {
+    Array.from(this.smtpTransports.values()).forEach((transport) => {
       transport.close();
-    }
+    });
 
     this.smtpTransports.clear();
 

@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 
 import { motion } from 'framer-motion';
-import { Bell, BookOpen, Loader2 } from 'lucide-react';
+import { AlertTriangle, Bell, BookOpen, Loader2, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -211,7 +219,7 @@ export default function SettingsPage(): JSX.Element {
     updateRegionalSettings,
     updateNotificationSettings,
     updatePrivacySettings,
-    resetSettings,
+    fullReset,
     startTutorial,
     resetTutorial,
   } = useSettingsStore();
@@ -219,6 +227,9 @@ export default function SettingsPage(): JSX.Element {
   const shouldReduceMotion = useReducedMotion();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [displayName, setDisplayName] = useState(user.displayName);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   // Sync displayName when user settings change (e.g., after reset)
   useEffect(() => {
@@ -230,10 +241,38 @@ export default function SettingsPage(): JSX.Element {
     updateUserSettings({ displayName });
   };
 
-  const handleResetSettings = (): void => {
-    if (confirm('Are you sure you want to reset all settings to defaults?')) {
-      resetSettings();
-      setDisplayName('');
+  const handleResetAllData = async (): Promise<void> => {
+    try {
+      setIsResetting(true);
+      setResetError(null);
+
+      // Call the backend to clear all databases
+      const result = await window.electronAPI.resetAllData();
+
+      if (!result.success) {
+        setResetError(result.error ?? 'Failed to reset data');
+        return;
+      }
+
+      // Reset the frontend stores
+      fullReset();
+
+      // Clear localStorage
+      localStorage.clear();
+
+      // Close dialog and reload the app to show welcome page
+      setShowResetDialog(false);
+
+      // Small delay to ensure state is saved, then reload
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reset data';
+      setResetError(message);
+      console.error('Failed to reset all data:', error);
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -378,21 +417,89 @@ export default function SettingsPage(): JSX.Element {
                 <motion.div
                   animate="animate"
                   initial="initial"
-                  transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.15 }}
+                  transition={{ ...transition, delay: shouldReduceMotion ? 0 : 0.2 }}
                   variants={cardVariants}
                 >
-                  <Card>
+                  <Card className="border-destructive/50">
                     <CardHeader>
-                      <CardTitle>Reset Settings</CardTitle>
-                      <CardDescription>Reset all settings to their default values</CardDescription>
+                      <CardTitle className="flex items-center gap-2 text-destructive">
+                        <Trash2 className="h-5 w-5" />
+                        Reset All Data
+                      </CardTitle>
+                      <CardDescription>
+                        Delete all data and reset the application to its initial state. This action
+                        cannot be undone.
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <Button variant="destructive" onClick={handleResetSettings}>
-                        Reset All Settings
+                      <Button variant="destructive" onClick={() => setShowResetDialog(true)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete All Data & Reset
                       </Button>
                     </CardContent>
                   </Card>
                 </motion.div>
+
+                {/* Reset All Data Confirmation Dialog */}
+                <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2 text-destructive">
+                        <AlertTriangle className="h-5 w-5" />
+                        Reset All Data
+                      </DialogTitle>
+                      <DialogDescription className="pt-2">
+                        <span className="font-semibold text-destructive">
+                          Warning: This action is irreversible!
+                        </span>
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <p className="text-sm text-muted-foreground">This will permanently delete:</p>
+                      <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                        <li>All calendars and events</li>
+                        <li>All task lists and tasks</li>
+                        <li>All email accounts and settings</li>
+                        <li>Family configuration and devices</li>
+                        <li>All synchronized data</li>
+                        <li>Application preferences</li>
+                      </ul>
+                      <p className="text-sm text-muted-foreground">
+                        The application will restart and you will need to set up everything again
+                        from the welcome screen.
+                      </p>
+                      {resetError && (
+                        <p className="text-sm font-medium text-destructive">{resetError}</p>
+                      )}
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button
+                        disabled={isResetting}
+                        variant="outline"
+                        onClick={() => setShowResetDialog(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        disabled={isResetting}
+                        variant="destructive"
+                        onClick={() => void handleResetAllData()}
+                      >
+                        {isResetting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Resetting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete All Data
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </motion.div>
           </TabsContent>

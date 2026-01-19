@@ -4,14 +4,13 @@ import { ExternalCalendarSyncService } from './ExternalCalendarSyncService';
 
 import type { YjsService } from './YjsService';
 import type { CalendarInfo } from '../main';
+import * as Y from 'yjs';
 
 // Mock Yjs
 const mockYMap = {
   get: vi.fn(),
   set: vi.fn(),
-  keys: vi.fn(() => ({
-    next: vi.fn(() => ({ done: true, value: undefined })),
-  })),
+  keys: vi.fn(),
   observe: vi.fn(),
   forEach: vi.fn(),
 };
@@ -47,7 +46,7 @@ describe('ExternalCalendarSyncService', () => {
         emailAccounts: mockYMap,
         emailLabels: mockYMap,
         conversations: mockYMap,
-        internalMessages: [] as Y.Array<unknown>,
+        internalMessages: [] as unknown as Y.Array<unknown>,
       })),
     } as unknown as YjsService;
 
@@ -62,9 +61,9 @@ describe('ExternalCalendarSyncService', () => {
   describe('start', () => {
     it('should start sync service', async () => {
       mockYMap.keys.mockReturnValue({
-        [Symbol.iterator]: () => ({
-          next: () => ({ done: true, value: undefined }),
-        }),
+        [Symbol.iterator]: function* () {
+          // Empty iterator
+        },
       });
 
       await syncService.start();
@@ -125,7 +124,7 @@ describe('ExternalCalendarSyncService', () => {
         syncInterval: 3600000,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        lastSyncAt: null,
+        lastSyncAt: undefined,
       };
 
       // Mock the calendars map in the structure
@@ -169,11 +168,12 @@ describe('ExternalCalendarSyncService', () => {
         externalSource: {
           type: 'ical_url',
           url: 'https://invalid-url.com/cal.ics',
+          syncDirection: 'one_way' as const,
         },
         syncInterval: 3600000,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        lastSyncAt: null,
+        lastSyncAt: undefined,
       };
 
       mockYMap.get.mockReturnValue(mockCalendar);
@@ -213,7 +213,7 @@ describe('ExternalCalendarSyncService', () => {
           syncInterval: 3600000,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          lastSyncAt: null,
+          lastSyncAt: undefined,
         },
         {
           id: 'cal-2',
@@ -231,7 +231,7 @@ describe('ExternalCalendarSyncService', () => {
           syncInterval: 3600000,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          lastSyncAt: null,
+          lastSyncAt: undefined,
         },
       ];
 
@@ -284,13 +284,13 @@ describe('ExternalCalendarSyncService', () => {
         syncInterval: 1000, // 1 second for testing
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        lastSyncAt: null,
+        lastSyncAt: undefined,
       };
 
       mockYMap.keys.mockReturnValue({
-        [Symbol.iterator]: () => ({
-          next: () => ({ done: false, value: 'cal-1' }),
-        }),
+        [Symbol.iterator]: function* () {
+          yield 'cal-1';
+        },
       });
 
       // Mock the calendars map in the structure

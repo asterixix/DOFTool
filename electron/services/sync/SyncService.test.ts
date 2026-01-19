@@ -361,7 +361,13 @@ describe('SyncService', () => {
 
       syncService.setAwarenessState(state);
 
-      expect(mockProvider.awareness.setLocalState).toHaveBeenCalledWith(state);
+      expect(mockProvider.awareness.setLocalState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: defaultConfig.deviceId,
+          deviceName: defaultConfig.deviceName,
+          currentView: 'calendar',
+        })
+      );
     });
 
     it('should get awareness states', () => {

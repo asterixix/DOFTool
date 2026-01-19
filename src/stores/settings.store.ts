@@ -85,6 +85,7 @@ interface SettingsState {
   updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
   updatePrivacySettings: (settings: Partial<PrivacySettings>) => void;
   resetSettings: () => void;
+  fullReset: () => void;
 }
 
 const defaultUserSettings: UserSettings = {
@@ -230,6 +231,18 @@ export const useSettingsStore = create<SettingsState>()(
           regional: defaultRegionalSettings,
           notifications: defaultNotificationSettings,
           privacy: defaultPrivacySettings,
+        }),
+
+      fullReset: () =>
+        set({
+          isFirstRun: true,
+          hasCompletedOnboarding: false,
+          user: defaultUserSettings,
+          appearance: defaultAppearanceSettings,
+          regional: defaultRegionalSettings,
+          notifications: defaultNotificationSettings,
+          privacy: defaultPrivacySettings,
+          tutorial: defaultTutorialState,
         }),
     }),
     {

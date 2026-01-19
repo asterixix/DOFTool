@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { EmailService } from './EmailService';
 
-import type { EmailAccountConfig, EmailMessage, SendEmailInput } from './EmailService';
+import type { EmailAccountConfig, SendEmailInput } from './EmailService';
 import type { EncryptionService } from './EncryptionService';
-import type { StorageService } from './StorageService';
 
 // Mock imapflow
 const mockImapClient = {
@@ -46,7 +45,12 @@ vi.mock('nodemailer', () => ({
 describe('EmailService', () => {
   let emailService: EmailService;
   let mockEncryptionService: EncryptionService;
-  let mockStorageService: StorageService;
+  let mockStorageService: {
+    get: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+    getKeysByPrefix: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,21 +65,15 @@ describe('EmailService', () => {
       set: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
       getKeysByPrefix: vi.fn().mockResolvedValue([]),
-    } as unknown as StorageService;
+    };
 
-    emailService = new EmailService(mockEncryptionService, mockStorageService);
+    emailService = new EmailService(mockEncryptionService, mockStorageService as any);
   });
 
   afterEach(async () => {
     try {
-      // Clean up connections
-      for (const accountId of emailService.getAccounts().map((a) => a.id)) {
-        try {
-          await emailService.disconnectImap(accountId);
-        } catch {
-          // Ignore errors
-        }
-      }
+      // Clean up connections by closing the service
+      await emailService.close();
     } catch {
       // Ignore cleanup errors
     }
@@ -89,33 +87,33 @@ describe('EmailService', () => {
     });
 
     it('should load accounts from storage', async () => {
-      const accountConfig: EmailAccountConfig = {
-        id: 'account-1',
-        email: 'test@example.com',
-        displayName: 'Test',
-        userId: 'user-1',
-        imap: {
-          host: 'imap.example.com',
-          port: 993,
-          secure: true,
-          auth: {
-            user: 'test@example.com',
-            pass: 'password',
-          },
-        },
-        smtp: {
-          host: 'smtp.example.com',
-          port: 465,
-          secure: true,
-          auth: {
-            user: 'test@example.com',
-            pass: 'password',
-          },
-        },
-      };
-
       mockStorageService.getKeysByPrefix.mockResolvedValue(['email:account:account-1']);
-      mockStorageService.get.mockResolvedValue(JSON.stringify(accountConfig));
+      mockStorageService.get.mockResolvedValue(
+        JSON.stringify({
+          id: 'account-1',
+          email: 'test@example.com',
+          displayName: 'Test',
+          userId: 'user-1',
+          imap: {
+            host: 'imap.example.com',
+            port: 993,
+            secure: true,
+            auth: {
+              user: 'test@example.com',
+              pass: 'password',
+            },
+          },
+          smtp: {
+            host: 'smtp.example.com',
+            port: 465,
+            secure: true,
+            auth: {
+              user: 'test@example.com',
+              pass: 'password',
+            },
+          },
+        })
+      );
 
       await emailService.initialize();
 

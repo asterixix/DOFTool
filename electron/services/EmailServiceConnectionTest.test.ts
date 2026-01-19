@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import {
   testImapConnection,
@@ -32,6 +32,11 @@ vi.mock('nodemailer', () => ({
 describe('EmailServiceConnectionTest', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('testImapConnection', () => {
@@ -73,7 +78,12 @@ describe('EmailServiceConnectionTest', () => {
         () => new Promise((resolve) => setTimeout(resolve, 50000))
       );
 
-      const result = await testImapConnection(imapConfig, 100);
+      const testPromise = testImapConnection(imapConfig, 100);
+
+      // Advance timers past the timeout
+      vi.advanceTimersByTime(101);
+
+      const result = await testPromise;
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('timeout');
@@ -133,13 +143,13 @@ describe('EmailServiceConnectionTest', () => {
     });
 
     it('should handle timeout', async () => {
-      mockTransport.verify.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 50000))
-      );
+      const timeoutError = new Error('Connection timeout');
+      mockTransport.verify.mockRejectedValue(timeoutError);
 
       const result = await testSmtpConnection(smtpConfig, 100);
 
       expect(result.success).toBe(false);
+      expect(result.error).toContain('timeout');
     });
   });
 

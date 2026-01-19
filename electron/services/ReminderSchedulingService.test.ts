@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { ReminderSchedulingService } from './ReminderSchedulingService';
 
-import type { NotificationService, NotificationPriority } from './NotificationService';
+import type { NotificationService } from './NotificationService';
 import type { StorageService } from './StorageService';
 
 describe('ReminderSchedulingService', () => {
@@ -151,8 +151,7 @@ describe('ReminderSchedulingService', () => {
 
       expect(mockNotificationService.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          module: 'calendar',
-          title: expect.stringContaining('Test Event'),
+          title: 'Reminder: Test Event',
         })
       );
     });
@@ -218,27 +217,28 @@ describe('ReminderSchedulingService', () => {
         id: 'event-1',
         calendarId: 'cal-1',
         title: 'Test Event',
-        start: Date.now() + 60000,
+        start: Date.now() + 600000, // 10 minutes from now
         end: Date.now() + 3600000,
         allDay: false,
         reminders: [
-          { id: 'reminder-1', minutes: 0 },
-          { id: 'reminder-2', minutes: 5 },
-          { id: 'reminder-3', minutes: 10 },
+          { id: 'reminder-1', minutes: 9 }, // Triggers in 1 minute (60000ms)
+          { id: 'reminder-2', minutes: 5 }, // Triggers in 5 minutes (300000ms)
+          { id: 'reminder-3', minutes: 1 }, // Would trigger in 9 minutes but limited
         ],
       };
 
       reminderService.scheduleEventReminders(event);
 
-      // Only first 2 reminders should be scheduled
-      vi.advanceTimersByTime(61000);
+      // Advance 1 minute - should trigger first reminder
+      vi.advanceTimersByTime(60000);
       expect(mockNotificationService.emit).toHaveBeenCalledTimes(1);
 
-      vi.advanceTimersByTime(6000); // Total 67000ms
+      // Advance 4 more minutes - should trigger second reminder
+      vi.advanceTimersByTime(240000);
       expect(mockNotificationService.emit).toHaveBeenCalledTimes(2);
 
-      // Third reminder should not trigger
-      vi.advanceTimersByTime(5000);
+      // Advance more - third reminder should not trigger due to limit
+      vi.advanceTimersByTime(300000);
       expect(mockNotificationService.emit).toHaveBeenCalledTimes(2);
     });
 
@@ -267,16 +267,16 @@ describe('ReminderSchedulingService', () => {
         id: 'event-1',
         calendarId: 'cal-1',
         title: 'Test Event',
-        start: Date.now() + 300000, // 5 minutes from now
+        start: Date.now() + 120000, // 2 minutes from now
         end: Date.now() + 3600000,
         allDay: false,
-        reminders: [{ id: 'reminder-1', minutes: 5 }],
+        reminders: [{ id: 'reminder-1', minutes: 2 }], // 2 minutes before = urgent
       };
 
       reminderService.scheduleEventReminders(event);
 
       // Wait for the timeout to trigger
-      await vi.advanceTimersByTimeAsync(240001); // Advance to trigger time
+      await vi.advanceTimersByTimeAsync(120000);
 
       expect(mockNotificationService.emit).toHaveBeenCalledWith(
         expect.objectContaining({

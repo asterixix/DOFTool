@@ -2,6 +2,14 @@ import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 
+// Handle Squirrel.Windows install/uninstall events immediately
+// This must be done before any other app initialization
+if (handleSquirrelEvent()) {
+  // Squirrel event handled, app will quit - don't continue initialization
+  // Use a no-op to satisfy TypeScript
+  process.exit(0);
+}
+
 import { initialize as initializeAptabase } from '@aptabase/electron/main';
 import {
   app,
@@ -42,6 +50,12 @@ import { testEmailConnections } from './services/EmailServiceConnectionTest';
 import { EncryptionService } from './services/EncryptionService';
 import { ExternalCalendarSyncService } from './services/ExternalCalendarSyncService';
 import {
+  FamilyDiscoveryService,
+  type DiscoveredFamily,
+  type JoinRequest,
+  type JoinApproval,
+} from './services/FamilyDiscoveryService';
+import {
   NotificationService,
   type NotificationEvent,
   type NotificationModule,
@@ -59,6 +73,7 @@ import {
   type PeerConnection,
 } from './services/sync';
 import { YjsService, type YjsDocumentStructure } from './services/YjsService';
+import { handleSquirrelEvent } from './squirrel-startup';
 
 import type { ImapConfig, SmtpConfig } from './services/EmailService';
 import type { Calendar, CalendarEvent } from '../src/modules/calendar/types/Calendar.types';
@@ -148,6 +163,7 @@ let externalCalendarSyncService: ExternalCalendarSyncService | null = null;
 let notificationService: NotificationService | null = null;
 let reminderSchedulingService: ReminderSchedulingService | null = null;
 let syncService: SyncService | null = null;
+let familyDiscoveryService: FamilyDiscoveryService | null = null;
 let autoUpdaterService: AutoUpdaterService | null = null;
 let tray: Tray | null = null;
 let isQuiting = false;
@@ -628,6 +644,29 @@ async function initializeServices(): Promise<void> {
     // Initialize P2P sync service
     initializeSyncService();
 
+    // Initialize family discovery service
+    const deviceId = await getStorageService().get('device:id');
+    if (deviceId) {
+      familyDiscoveryService = new FamilyDiscoveryService();
+      familyDiscoveryService.initialize(deviceId);
+      console.log('[FamilyDiscovery] Service initialized');
+
+      // If we have a family and are admin, start publishing
+      try {
+        const familyState = getFamilyState();
+        if (familyState.family) {
+          const isAdmin = familyState.permissions.some(
+            (p) => p.memberId === deviceId && p.role === 'admin'
+          );
+          if (isAdmin) {
+            familyDiscoveryService.startPublishing(familyState.family.id, familyState.family.name);
+          }
+        }
+      } catch {
+        // No family yet, that's fine
+      }
+    }
+
     await loadAppSettings();
     applyAutoLaunchSetting();
     createTray();
@@ -1017,35 +1056,79 @@ process.on('unhandledRejection', (reason, promise) => {
   }
 });
 
+// Track if cleanup has been performed to avoid double cleanup
+let isCleaningUp = false;
+let cleanupComplete = false;
+
 if (typeof app !== 'undefined') {
-  app.on('will-quit', () => {
-    // Cleanup services before app quits
+  app.on('before-quit', (event) => {
+    // If cleanup is already complete, allow quit
+    if (cleanupComplete) {
+      return;
+    }
+
+    // Prevent quit until cleanup is done
+    event.preventDefault();
+
+    // Avoid starting cleanup twice
+    if (isCleaningUp) {
+      return;
+    }
+    isCleaningUp = true;
+
     console.log('App is quitting - cleaning up services...');
+
     // Stop external calendar sync service
     if (externalCalendarSyncService) {
       externalCalendarSyncService.stop();
     }
-    // Stop email service
-    if (emailService) {
-      void emailService.close();
-    }
-    void cleanupServices().then(() => {
-      console.log('Cleanup complete - app will now quit');
-    });
+
+    // Perform async cleanup then quit
+    void (async () => {
+      try {
+        // Close email service
+        if (emailService) {
+          await emailService.close().catch((error) => {
+            console.error('Error closing EmailService:', error);
+          });
+        }
+
+        // Cleanup storage and Yjs services
+        await cleanupServices();
+
+        console.log('Cleanup complete - app will now quit');
+      } catch (error) {
+        console.error('Error during cleanup:', error);
+      } finally {
+        cleanupComplete = true;
+        app.quit();
+      }
+    })();
   });
 }
 
 // Handle app termination (SIGTERM, SIGINT, etc.)
 process.on('SIGTERM', () => {
+  if (isCleaningUp || cleanupComplete) {
+    process.exit(0);
+    return;
+  }
+  isCleaningUp = true;
   console.log('SIGTERM received - cleaning up services...');
   void cleanupServices().then(() => {
+    cleanupComplete = true;
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
+  if (isCleaningUp || cleanupComplete) {
+    return;
+  }
+  isCleaningUp = true;
   console.log('SIGINT received - cleaning up services...');
   void cleanupServices().then(() => {
+    cleanupComplete = true;
     console.log('Cleanup complete - app will now quit');
   });
 });
@@ -1310,6 +1393,43 @@ if (typeof ipcMain !== 'undefined') {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to open URL';
       console.error('Failed to open external URL:', error);
+      return { success: false, error: message };
+    }
+  });
+
+  // Reset all data - clears databases and returns app to initial state
+  ipcMain.handle('app:resetAllData', async () => {
+    try {
+      console.log('[Reset] Starting full app data reset...');
+
+      // Close Yjs service to release any locks before deleting data
+      if (yjsService) {
+        await yjsService.close();
+        console.log('[Reset] Yjs service closed');
+
+        // Reopen Yjs service after deleting data
+        yjsService = new YjsService();
+        await yjsService.initialize();
+        console.log('[Reset] Yjs service reopened');
+      }
+
+      // Delete database directories
+      const { rm } = await import('fs/promises');
+      const userDataPath = app.getPath('userData');
+
+      const dataDir = path.join(userDataPath, 'data');
+      try {
+        await rm(dataDir, { recursive: true, force: true });
+        console.log('[Reset] Data directory deleted:', dataDir);
+      } catch (error) {
+        console.warn('[Reset] Failed to delete data directory:', error);
+      }
+
+      console.log('[Reset] All data cleared successfully');
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reset data';
+      console.error('[Reset] Failed to reset app data:', error);
       return { success: false, error: message };
     }
   });
@@ -1762,6 +1882,159 @@ if (typeof ipcMain !== 'undefined') {
     permissionsMap.set(memberId, permission);
     return permission;
   });
+
+  // ============================================================================
+  // Family Discovery IPC Handlers (mDNS-based local network discovery)
+  // ============================================================================
+
+  ipcMain.handle('discovery:startDiscovering', () => {
+    if (!familyDiscoveryService) {
+      throw new Error('Family discovery service not initialized');
+    }
+    familyDiscoveryService.startDiscovering();
+    return { success: true };
+  });
+
+  ipcMain.handle('discovery:stopDiscovering', () => {
+    if (!familyDiscoveryService) {
+      return { success: false };
+    }
+    familyDiscoveryService.stopDiscovering();
+    return { success: true };
+  });
+
+  ipcMain.handle('discovery:getDiscoveredFamilies', (): DiscoveredFamily[] => {
+    if (!familyDiscoveryService) {
+      return [];
+    }
+    return familyDiscoveryService.getDiscoveredFamilies();
+  });
+
+  ipcMain.handle('discovery:requestJoin', async (_event, familyId: string) => {
+    if (!familyDiscoveryService) {
+      throw new Error('Family discovery service not initialized');
+    }
+
+    const request = familyDiscoveryService.createJoinRequest(familyId);
+
+    // Send the join request to the admin device via WebRTC signaling
+    // For now, we'll use a simple approach where the request is stored
+    // and the admin device will see it when they check for pending requests
+
+    // Store the request in local storage so we can track its status
+    await getStorageService().set(
+      `joinRequest:${request.id}`,
+      JSON.stringify({
+        ...request,
+        targetFamilyId: familyId,
+      })
+    );
+
+    return request;
+  });
+
+  ipcMain.handle('discovery:getPendingJoinRequests', (): JoinRequest[] => {
+    if (!familyDiscoveryService) {
+      return [];
+    }
+    return familyDiscoveryService.getPendingJoinRequests();
+  });
+
+  ipcMain.handle(
+    'discovery:approveJoinRequest',
+    (_event, requestId: string, role: PermissionRole): JoinApproval | null => {
+      if (!familyDiscoveryService) {
+        throw new Error('Family discovery service not initialized');
+      }
+
+      const familyState = getFamilyState();
+      if (!familyState.family) {
+        throw new Error('No family configured');
+      }
+
+      const approval = familyDiscoveryService.approveJoinRequest(
+        requestId,
+        role,
+        familyState.family.id,
+        familyState.family.name
+      );
+
+      if (approval) {
+        // Create an invitation token for the approved device
+        const { invitationsMap } = getFamilyCollections();
+        const token = getEncryptionService().generateToken(24);
+        const invitation: InvitationInfo = {
+          token,
+          role,
+          createdAt: Date.now(),
+          used: false,
+        };
+        invitationsMap.set(token, invitation);
+        approval.syncToken = token;
+
+        // Notify renderer about the approval
+        if (mainWindow) {
+          mainWindow.webContents.send('discovery:joinRequestApproved', approval);
+        }
+      }
+
+      return approval;
+    }
+  );
+
+  ipcMain.handle('discovery:rejectJoinRequest', (_event, requestId: string) => {
+    if (!familyDiscoveryService) {
+      return false;
+    }
+    const rejected = familyDiscoveryService.rejectJoinRequest(requestId);
+
+    if (rejected && mainWindow) {
+      mainWindow.webContents.send('discovery:joinRequestRejected', requestId);
+    }
+
+    return rejected;
+  });
+
+  ipcMain.handle('discovery:startPublishing', () => {
+    if (!familyDiscoveryService) {
+      throw new Error('Family discovery service not initialized');
+    }
+
+    const familyState = getFamilyState();
+    if (!familyState.family) {
+      throw new Error('No family configured');
+    }
+
+    familyDiscoveryService.startPublishing(familyState.family.id, familyState.family.name);
+    return { success: true };
+  });
+
+  ipcMain.handle('discovery:stopPublishing', () => {
+    if (!familyDiscoveryService) {
+      return { success: false };
+    }
+    familyDiscoveryService.stopPublishing();
+    return { success: true };
+  });
+
+  // Listen for join requests from other devices (via WebRTC awareness)
+  ipcMain.handle(
+    'discovery:receiveJoinRequest',
+    (_event, deviceId: string, deviceName: string): JoinRequest => {
+      if (!familyDiscoveryService) {
+        throw new Error('Family discovery service not initialized');
+      }
+
+      const request = familyDiscoveryService.receiveJoinRequest(deviceId, deviceName);
+
+      // Notify renderer about the new join request
+      if (mainWindow) {
+        mainWindow.webContents.send('discovery:newJoinRequest', request);
+      }
+
+      return request;
+    }
+  );
 
   // ============================================================================
   // P2P Sync IPC Handlers
